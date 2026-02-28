@@ -280,14 +280,15 @@ export default function Guest() {
       setMicEnabled(true)
 
       let smoothedAvg = 0
+      let displayVolume = 0
       const clapTimestamps = []
 
       const interval = setInterval(() => {
         analyser.getByteFrequencyData(data)
         const instant = data.reduce((a, b) => a + b, 0) / data.length / 255
         const now = Date.now()
-        if (instant - smoothedAvg > 0.40 && instant > 0.35) {
-          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 300) {
+        if (instant - smoothedAvg > 0.05 && instant > 0.03) {
+          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 100) {
             clapTimestamps.push(now)
           }
         }
@@ -296,9 +297,13 @@ export default function Guest() {
         while (clapTimestamps.length && clapTimestamps[0] < cutoff) clapTimestamps.shift()
         const recentClaps = clapTimestamps.filter(t => t > now - 2000).length
         const clap_rate = Math.min(recentClaps / 4, 1.0)
-        const gatedVolume = instant > 0.30 ? instant : 0
-        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: gatedVolume, clap_rate })
-      }, 200)
+        const amplified = instant > 0.02 ? Math.min(instant * 8, 1.0) : 0
+        // Rise fast, decay slowly so meter stays elevated
+        displayVolume = amplified > displayVolume
+          ? amplified
+          : displayVolume * 0.85
+        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: displayVolume, clap_rate })
+      }, 150)
       micStreamRef.current._interval = interval
     } catch (e) {
       console.warn('[Mic] Permission denied or unavailable:', e)
