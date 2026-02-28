@@ -126,12 +126,17 @@ class RoomService:
         return assigned_role
 
     def change_user_role(self, room_id: str, user_id: str, new_role: Role) -> Optional[str]:
-        """Change a user's role. Returns old role value on success, None on failure."""
+        """Change a user's role. Returns old role value on success, None on failure.
+        Returns None if the role is already taken by another user."""
         if room_id not in self.rooms:
             return None
         room_roles = self.user_roles.get(room_id, {})
         if user_id not in room_roles:
             return None
+        # Reject if another user already has this role
+        for uid, r in room_roles.items():
+            if uid != user_id and r == new_role:
+                return None
         old_role = room_roles[user_id]
         room_roles[user_id] = new_role
         display_name = self.user_display_names.get(room_id, {}).get(user_id, user_id[:8])

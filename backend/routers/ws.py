@@ -500,6 +500,12 @@ async def websocket_endpoint(websocket: WebSocket):
                                 if room_id in room_service.rooms:
                                     state_msg = room_service.get_state_update_message(room_id)
                                     await room_service.broadcast_json(room_id, state_msg)
+                            else:
+                                await websocket.send_json({
+                                    "type": "role_taken",
+                                    "role": role_str,
+                                    "message": f"Role {role_str} is already taken",
+                                })
                         except ValueError:
                             await websocket.send_json({"type": "error", "message": f"Unknown role: {role_str}"})
 

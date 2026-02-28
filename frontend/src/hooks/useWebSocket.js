@@ -104,6 +104,12 @@ class WebSocketManager {
         console.log('[WS] Role changed:', msg.old_role, '→', msg.role)
         this.store?.setRole(msg.role)
         break
+      case 'role_taken':
+        console.warn('[WS] Role taken:', msg.role, '— reverting')
+        // Revert optimistic update: find our actual role from participants
+        { const me = this.store?.participants?.find(p => p.user_id === getStoreState().userId)
+          if (me) this.store?.setRole(me.role) }
+        break
       case 'room_closed':
         console.log('[WS] Room closed by host:', msg.message)
         this.store?.clearRoom()

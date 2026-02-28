@@ -8,12 +8,16 @@ const allRoles = Object.values(ROLES)
 export default function RoleCard({ role }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const { changeRole } = useWebSocket()
-  const { userId, roomId } = useRoomStore()
+  const { userId, roomId, participants } = useRoomStore()
 
   if (!role) return null
 
+  const takenRoles = new Set(
+    (participants || []).filter((p) => p.user_id !== userId).map((p) => p.role)
+  )
+
   const handleSwitch = (newRoleId) => {
-    if (newRoleId === role.id) return
+    if (newRoleId === role.id || takenRoles.has(newRoleId)) return
     changeRole(userId, roomId, newRoleId)
     setPickerOpen(false)
   }
@@ -49,13 +53,15 @@ export default function RoleCard({ role }) {
         <div className="mt-4 space-y-2">
           {allRoles.map((r) => {
             const isCurrent = r.id === role.id
+            const isTaken = takenRoles.has(r.id)
+            const disabled = isCurrent || isTaken
             return (
               <button
                 key={r.id}
                 onClick={() => handleSwitch(r.id)}
-                disabled={isCurrent}
+                disabled={disabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-150 ${
-                  isCurrent
+                  disabled
                     ? 'bg-white/5 opacity-50 cursor-default'
                     : 'bg-white/[0.03] hover:bg-white/10 hover:border-[#00D1FF]/30 cursor-pointer'
                 } border border-white/5`}
@@ -67,6 +73,11 @@ export default function RoleCard({ role }) {
                     {isCurrent && (
                       <span className="ml-2 text-[10px] font-bold text-[#00D1FF]/60 bg-[#00D1FF]/10 px-2 py-0.5 rounded-full">
                         Current
+                      </span>
+                    )}
+                    {isTaken && !isCurrent && (
+                      <span className="ml-2 text-[10px] font-bold text-red-400/60 bg-red-400/10 px-2 py-0.5 rounded-full">
+                        Taken
                       </span>
                     )}
                   </div>
