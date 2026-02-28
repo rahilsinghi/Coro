@@ -23,7 +23,7 @@ function formatInputSummary(inputs) {
 
 export default function Host() {
   const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs, reset } = useRoomStore()
-  const { startMusic, stopMusic } = useWebSocket()
+  const { startMusic, stopMusic, closeRoom } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const navigate = useNavigate()
   const [showQR, setShowQR] = useState(true)
@@ -304,7 +304,7 @@ export default function Host() {
               {/* Leave Room */}
               <button
                 onClick={() => {
-                  if (isPlaying) stopMusic(userId, roomId)
+                  closeRoom(userId, roomId)
                   reset()
                   navigate('/')
                 }}
@@ -315,7 +315,7 @@ export default function Host() {
                   color: '#f87171',
                 }}
               >
-                Leave Room
+                End Session
               </button>
             </div>
           </div>

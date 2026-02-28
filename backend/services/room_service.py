@@ -138,6 +138,21 @@ class RoomService:
         total = len(self.user_roles.get(room_id, {}))
         return max(1, math.ceil(total / 2))
 
+    def destroy_room(self, room_id: str):
+        """Fully destroy a room — stop tick loop, purge all state."""
+        self.stop_tick_loop(room_id)
+        self.rooms.pop(room_id, None)
+        self.connections.pop(room_id, None)
+        self.user_sockets.pop(room_id, None)
+        self.user_roles.pop(room_id, None)
+        self._host_devices.pop(room_id, None)
+        self._room_names.pop(room_id, None)
+        self.user_display_names.pop(room_id, None)
+        self._timeline.pop(room_id, None)
+        self._drop_votes.pop(room_id, None)
+        self._drop_window_start.pop(room_id, None)
+        print(f"[Room] Destroyed room {room_id}")
+
     def record_drop(self, room_id: str, connection_id: str, user_id: str = None) -> str:
         """
         Record a drop vote, keyed by connection_id (one unique vote per WebSocket

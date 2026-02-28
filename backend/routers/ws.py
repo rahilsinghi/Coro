@@ -220,6 +220,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     await lyria_service.stop_session(room_id)
                     await room_service.broadcast_json(room_id, {"type": "music_stopped"})
 
+            # ── CLOSE ROOM (host leaves) ─────────────────────────────────────
+            elif msg_type == "close_room":
+                if not room_id:
+                    continue
+                room = room_service.rooms.get(room_id)
+                if not room or room.host_id != user_id:
+                    await websocket.send_json({"type": "error", "message": "Only host can close the room"})
+                    continue
+                # Stop music if playing
+                if room.is_playing:
+                    room.is_playing = False
+                    room_service.stop_tick_loop(room_id)
+                    await lyria_service.stop_session(room_id)
+                # Notify all clients the room is closing
+                await room_service.broadcast_json(room_id, {
+                    "type": "room_closed",
+                    "message": "Host ended the session",
+                })
+                # Destroy all room state
+                room_service.destroy_room(room_id)
+                print(f"[WS] Room {room_id} closed by host {user_id}")
+                room_id = None
+
             # ── INPUT UPDATE ─────────────────────────────────────────────────
             elif msg_type == "input_update":
                 if not room_id:
