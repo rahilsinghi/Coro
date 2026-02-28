@@ -8,6 +8,7 @@ export const useRoomStore = create((set) => ({
   isHost: false,
   isConnected: false,
   isPlaying: false,
+  hasEnteredCoro: sessionStorage.getItem('hasEnteredCoro') === 'true',
 
   // Music state (from server state_update)
   activePrompts: [],
@@ -17,8 +18,12 @@ export const useRoomStore = create((set) => ({
   currentInputs: {},
   influenceWeights: {},
   geminiReasoning: '',
+  participants: [],
 
-  // Actions
+  setEnteredCoro: (val) => {
+    sessionStorage.setItem('hasEnteredCoro', val)
+    set({ hasEnteredCoro: val })
+  },
   setRoom: (roomId, userId, role, isHost) =>
     set({ roomId, userId, role, isHost }),
 
@@ -34,6 +39,7 @@ export const useRoomStore = create((set) => ({
       currentInputs: msg.current_inputs || {},
       influenceWeights: msg.influence_weights || {},
       geminiReasoning: msg.gemini_reasoning || '',
+      participants: msg.participants || [],
     }),
 
   reset: () =>
@@ -48,5 +54,6 @@ export const useRoomStore = create((set) => ({
       bpm: 100,
       currentInputs: {},
       influenceWeights: {},
+      participants: [],
     }),
 }))

@@ -18,14 +18,16 @@ class RoomService:
         self.connections: Dict[str, Set[WebSocket]] = {}
         # room_id → user_id → WebSocket
         self.user_sockets: Dict[str, Dict[str, WebSocket]] = {}
-        # user_id → role
-        self.user_roles: Dict[str, Role] = {}
+        # room_id → user_id → role
+        self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
+        # room_id → host device name (for lobby room listing)
+        self._host_devices: Dict[str, str] = {}
         # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
 
-    def create_room(self, host_id: str) -> RoomState:
+    def create_room(self, host_id: str, device_name: str = "Unknown") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
         room = RoomState(
             room_id=room_id,
@@ -40,7 +42,24 @@ class RoomService:
         self.rooms[room_id] = room
         self.connections[room_id] = set()
         self.user_sockets[room_id] = {}
+        self.user_roles[room_id] = {}
+        self._host_devices[room_id] = device_name
+        print(f"[Room] Created room {room_id} — host={host_id}, device={device_name}")
         return room
+
+    def get_rooms_list(self) -> list:
+        """Return list of active rooms for the lobby."""
+        rooms_list = []
+        for room_id, room in self.rooms.items():
+            room_roles = self.user_roles.get(room_id, {})
+            rooms_list.append({
+                "room_id": room_id,
+                "member_count": len(room_roles),
+                "is_playing": room.is_playing,
+                "host_device": self._host_devices.get(room_id, "Unknown"),
+                "roles_taken": [role.value for role in room_roles.values()],
+            })
+        return rooms_list
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
         if room_id not in self.rooms:
@@ -49,12 +68,15 @@ class RoomService:
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
-        # If reconnecting, reuse existing role so phone screen-off doesn't lose their slot
-        if user_id in self.user_roles:
-            return self.user_roles[user_id]
+        room_roles = self.user_roles.get(room_id, {})
 
-        # Assign next available role for new users
-        taken_roles = set(self.user_roles.values())
+        # If user already has a role in this room (reconnect), reuse it
+        if user_id in room_roles:
+            print(f"[Room] User {user_id} reconnected with existing role {room_roles[user_id].value}")
+            return room_roles[user_id]
+
+        # Assign next available role
+        taken_roles = set(room_roles.values())
         assigned_role = None
         for role in self._role_queue:
             if role not in taken_roles:
@@ -64,7 +86,8 @@ class RoomService:
         if not assigned_role:
             assigned_role = Role.ENERGY
 
-        self.user_roles[user_id] = assigned_role
+        self.user_roles.setdefault(room_id, {})[user_id] = assigned_role
+        print(f"[Room] Assigned {assigned_role.value} to user {user_id} in room {room_id}")
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
@@ -72,7 +95,8 @@ class RoomService:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        # Intentionally keep user_roles entry so reconnecting users get their original role back
+        # NOTE: Do NOT pop user_roles here — role persists across reconnects
+        # Roles are only cleaned up when the room is destroyed
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
@@ -99,6 +123,8 @@ class RoomService:
 
     def get_state_update_message(self, room_id: str) -> dict:
         room = self.rooms[room_id]
+        room_roles = self.user_roles.get(room_id, {})
+        participants = [{"user_id": uid, "role": role.value} for uid, role in room_roles.items()]
         return {
             "type": "state_update",
             "active_prompts": [p.model_dump() for p in room.active_prompts],
@@ -107,6 +133,7 @@ class RoomService:
             "brightness": room.brightness,
             "current_inputs": room.current_inputs,
             "influence_weights": room.influence_weights,
+            "participants": participants,
         }
 
     async def broadcast_json(self, room_id: str, message: dict):

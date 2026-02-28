@@ -21,7 +21,7 @@ export default function AudioVisualizer({ isPlaying }) {
 
       if (!analyser || !isPlaying) {
         // Idle flat line
-        ctx.strokeStyle = '#1e1e2e'
+        ctx.strokeStyle = '#004080'
         ctx.lineWidth = 2
         ctx.beginPath()
         ctx.moveTo(0, H / 2)
@@ -41,10 +41,10 @@ export default function AudioVisualizer({ isPlaying }) {
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = (dataArray[i] / 255) * H * 0.85
 
-        // Gradient from purple to cyan
-        const r = Math.round(124 + (6 - 124) * (i / bufferLength))
-        const g = Math.round(58 + (182 - 58) * (i / bufferLength))
-        const b = Math.round(237 + (212 - 237) * (i / bufferLength))
+        // Gradient from navy to vibrant blue
+        const r = Math.round(0 + (0 - 0) * (i / bufferLength))
+        const g = Math.round(64 + (195 - 64) * (i / bufferLength))
+        const b = Math.round(128 + (255 - 128) * (i / bufferLength))
 
         ctx.fillStyle = `rgb(${r},${g},${b})`
         ctx.fillRect(x, H - barHeight, barWidth - 1, barHeight)

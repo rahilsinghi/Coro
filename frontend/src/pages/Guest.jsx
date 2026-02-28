@@ -6,6 +6,7 @@ import BPMSlider from '../components/controls/BPMSlider.jsx'
 import MoodInput from '../components/controls/MoodInput.jsx'
 import GenreGrid from '../components/controls/GenreGrid.jsx'
 import InstrumentGrid from '../components/controls/InstrumentGrid.jsx'
+import EnergyControl from '../components/controls/EnergyControl.jsx'
 import { ROLES } from '../lib/constants.js'
 
 export default function Guest() {
@@ -39,7 +40,7 @@ export default function Guest() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">
-            Co<span className="text-cs-accent">ro</span>
+            CORO
           </h1>
           <p className="text-cs-muted text-sm">
             Room <span className="font-mono text-white">{roomId}</span>
@@ -60,11 +61,7 @@ export default function Guest() {
         {role === 'vibe_setter' && <MoodInput />}
         {role === 'genre_dj' && <GenreGrid />}
         {role === 'instrumentalist' && <InstrumentGrid />}
-        {role === 'energy' && (
-          <div className="card text-cs-muted text-sm">
-            Energy controls coming soon — use the sliders!
-          </div>
-        )}
+        {role === 'energy' && <EnergyControl />}
       </div>
 
       {/* Active prompts mini display */}

@@ -3,12 +3,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
+import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 
 export default function Host() {
-  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning } = useRoomStore()
+  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning, participants } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const [showQR, setShowQR] = useState(true)
@@ -39,7 +40,7 @@ export default function Host() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            🎵 Co<span className="text-cs-accent">ro</span>
+            CORO
           </h1>
           <p className="text-cs-muted text-sm mt-0.5">
             Room <span className="font-mono text-white">{roomId}</span>
@@ -95,6 +96,31 @@ export default function Host() {
             </div>
           )}
 
+          {/* Band Members */}
+          <div className="card">
+            <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
+              Band Members
+            </p>
+            {participants.length === 0 ? (
+              <p className="text-cs-muted text-sm">Waiting for players...</p>
+            ) : (
+              <div className="space-y-2">
+                {participants.map((p) => {
+                  const roleInfo = ROLES[p.role]
+                  return (
+                    <div key={p.user_id} className={`flex items-center gap-3 p-2 rounded-lg ${roleInfo?.bgColor || ''} border ${roleInfo?.borderColor || 'border-cs-border'}`}>
+                      <span className="text-lg">{roleInfo?.emoji || '🎵'}</span>
+                      <div>
+                        <p className={`text-sm font-bold ${roleInfo?.color || 'text-white'}`}>{roleInfo?.label || p.role}</p>
+                        <p className="text-xs text-cs-muted">{roleInfo?.description || ''}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Influence meter */}
           <div className="card flex-1">
             <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
@@ -106,11 +132,10 @@ export default function Host() {
           {/* Play / Stop */}
           <button
             onClick={isPlaying ? handleStop : handlePlay}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-              isPlaying
-                ? 'bg-red-600 hover:bg-red-500 text-white'
-                : 'bg-cs-accent hover:bg-purple-500 text-white animate-glow'
-            }`}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${isPlaying
+              ? 'bg-red-600 hover:bg-red-500 text-white'
+              : 'bg-cs-accent hover:bg-blue-400 text-white shadow-[0_0_15px_rgba(0,195,255,0.4)]'
+              }`}
           >
             {isPlaying ? '⏹ Stop Music' : '▶ Start Music'}
           </button>

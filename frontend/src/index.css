@@ -15,7 +15,7 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-cs-accent hover:bg-purple-500 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 active:scale-95;
+    @apply bg-cs-accent hover:bg-blue-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 active:scale-95;
   }
 
   .btn-secondary {
@@ -31,6 +31,6 @@
   }
 
   .tile-active {
-    @apply border-cs-accent text-cs-accent bg-purple-950/30;
+    @apply border-cs-accent text-cs-accent bg-blue-900/20;
   }
 }

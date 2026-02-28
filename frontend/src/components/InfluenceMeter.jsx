@@ -31,11 +31,11 @@ export default function InfluenceMeter({ weights }) {
             dataKey="value"
           >
             {data.map((entry) => (
-              <Cell key={entry.role} fill={ROLE_COLORS[entry.role] || '#7c3aed'} />
+              <Cell key={entry.role} fill={ROLE_COLORS[entry.role] || '#00c3ff'} />
             ))}
           </Pie>
           <Tooltip
-            contentStyle={{ background: '#12121a', border: '1px solid #1e1e2e', borderRadius: 8 }}
+            contentStyle={{ background: '#002b4d', border: '1px solid #004080', borderRadius: 12 }}
             formatter={(v) => [`${v}%`, 'Influence']}
           />
         </PieChart>
