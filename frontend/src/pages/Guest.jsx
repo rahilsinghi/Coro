@@ -286,17 +286,18 @@ export default function Guest() {
         analyser.getByteFrequencyData(data)
         const instant = data.reduce((a, b) => a + b, 0) / data.length / 255
         const now = Date.now()
-        if (instant - smoothedAvg > 0.10 && instant > 0.08) {
-          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 120) {
+        if (instant - smoothedAvg > 0.20 && instant > 0.15) {
+          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 200) {
             clapTimestamps.push(now)
           }
         }
-        smoothedAvg = smoothedAvg * 0.85 + instant * 0.15
+        smoothedAvg = smoothedAvg * 0.7 + instant * 0.3
         const cutoff = now - 3000
         while (clapTimestamps.length && clapTimestamps[0] < cutoff) clapTimestamps.shift()
         const recentClaps = clapTimestamps.filter(t => t > now - 2000).length
         const clap_rate = Math.min(recentClaps / 4, 1.0)
-        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: instant, clap_rate })
+        const gatedVolume = instant > 0.12 ? instant : 0
+        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: gatedVolume, clap_rate })
       }, 200)
       micStreamRef.current._interval = interval
     } catch (e) {
