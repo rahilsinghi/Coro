@@ -5,6 +5,7 @@ Wires Lyria audio broadcast → room broadcast.
 Wires Gemini tick → Lyria prompt update → state broadcast.
 """
 import json
+import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from google.genai import types as genai_types
 
@@ -82,6 +83,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
     room_id = None
     user_id = None
+    # Unique per-connection ID for drop vote deduplication (one vote per physical
+    # browser tab/device regardless of shared localStorage user_id)
+    connection_id = str(uuid.uuid4())
 
     # WS heartbeat to keep Railway connection alive
     import asyncio
@@ -291,7 +295,7 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "drop":
                 if not room_id:
                     continue
-                result = room_service.record_drop(room_id, user_id)
+                result = room_service.record_drop(room_id, connection_id, user_id)
 
                 if result == "already_voted":
                     await websocket.send_json({
@@ -301,6 +305,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
 
                 elif result == "triggered":
+                    # How many seconds before the Lyria update fires.
+                    # Frontend reads this from the message — not hardcoded there.
+                    DROP_DELAY = 3
                     from google.genai import types as drop_types
                     drop_prompts = [
                         drop_types.WeightedPrompt(
@@ -314,17 +321,30 @@ async def websocket_endpoint(websocket: WebSocket):
                     ]
                     room = room_service.rooms.get(room_id)
                     if room:
-                        await lyria_service.update_prompts(
-                            room_id=room_id,
-                            prompts=drop_prompts,
-                            bpm=min(room.bpm + 20, 160),
-                            density=1.0,
-                            brightness=0.3,
-                        )
+                        # Tell all clients the drop is coming (they count down from in_seconds)
                         await room_service.broadcast_json(room_id, {
-                            "type": "drop_triggered",
-                            "message": "🔥 DROP!"
+                            "type": "drop_incoming",
+                            "in_seconds": DROP_DELAY,
+                            "count": 3,
                         })
+                        # Fire Lyria update after the countdown, then confirm to clients
+                        async def _fire_drop(rid=room_id, r=room, dp=drop_prompts):
+                            await asyncio.sleep(DROP_DELAY)
+                            try:
+                                await lyria_service.update_prompts(
+                                    room_id=rid,
+                                    prompts=dp,
+                                    bpm=min(r.bpm + 20, 160),
+                                    density=1.0,
+                                    brightness=0.3,
+                                )
+                                await room_service.broadcast_json(rid, {
+                                    "type": "drop_triggered",
+                                    "message": "🔥 DROP!"
+                                })
+                            except Exception as e:
+                                print(f"[WS] Drop fire failed for room {rid}: {e}")
+                        asyncio.create_task(_fire_drop())
 
                 elif result == "registered":
                     count = room_service.get_drop_vote_count(room_id)
