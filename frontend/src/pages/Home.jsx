@@ -116,7 +116,7 @@ export default function Home() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 pt-32 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="w-full max-w-4xl flex flex-col items-center">
         {/* Connection Indicator */}
         <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-2 rounded-full mb-12 backdrop-blur-md">

@@ -86,6 +86,13 @@ class WebSocketManager {
       case 'music_stopped':
         this.store?.setPlaying(false)
         break
+      case 'applause_level':
+        this.store?.setApplauseLevel(msg.level ?? 0)
+        break
+      case 'drop_progress':
+      case 'drop_triggered':
+        // Forwarded to per-component listeners via onMessageCallbacks
+        break
       case 'error':
         console.error('[WS] Server error:', msg.message)
         break
@@ -169,5 +176,5 @@ export function useWebSocket() {
     })
   }, [send])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput, addListener: (cb) => manager.addListener(cb) }
 }
