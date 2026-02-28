@@ -61,9 +61,9 @@ export default function Home() {
     <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="w-full max-w-4xl flex flex-col items-center">
         {/* Connection Indicator */}
-        <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-2 rounded-full mb-12 backdrop-blur-md">
+        <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-2 rounded-full mb-10 backdrop-blur-md">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#00D1FF] shadow-[0_0_10px_#00D1FF]' : 'bg-yellow-400 animate-pulse'}`} />
-          <span className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-black">
+          <span className="text-white/60 text-[10px] uppercase tracking-[0.2em] font-black">
             {isConnected ? 'Studio Network Online' : 'Connecting to Network...'}
           </span>
         </div>
@@ -74,7 +74,9 @@ export default function Home() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter">
               Coro <span className="text-[#00D1FF]">Studio</span>
             </h1>
-            <p className="text-white/50 font-medium text-sm sm:text-base">Create a new session or join an existing session.</p>
+            <p className="font-medium text-sm sm:text-base" style={{ color: 'rgba(180, 220, 255, 0.75)' }}>
+              Create a new session or join an existing session.
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -86,9 +88,9 @@ export default function Home() {
               {loading ? 'Initializing...' : 'Host New Session'}
             </button>
 
-            <div className="flex items-center gap-4 text-white/10">
+            <div className="flex items-center gap-4" style={{ color: 'rgba(255,255,255,0.38)' }}>
               <div className="flex-1 h-px bg-current" />
-              <span className="text-[10px] uppercase tracking-[0.3em] font-black">OR join by code</span>
+              <span className="text-[10px] uppercase tracking-[0.3em] font-black whitespace-nowrap">OR join by code</span>
               <div className="flex-1 h-px bg-current" />
             </div>
 
@@ -119,7 +121,7 @@ export default function Home() {
           </div>
         </div>
 
-        <p className="mt-16 text-white/20 text-[10px] uppercase tracking-[0.4em] font-black">
+        <p className="mt-12 text-[10px] uppercase tracking-[0.4em] font-black" style={{ color: 'rgba(150,200,255,0.45)' }}>
           Powered by Gemini 2.5 + Google Lyria
         </p>
       </div>

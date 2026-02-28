@@ -223,7 +223,16 @@ export default function GlobeExperience({ analyser }) {
                         transform: hasEnteredCoro ? 'scale(1.1) translateY(4%)' : 'scale(1) translateY(0)',
                     }}
                 >
-                    <Canvas camera={{ position: [0, 0, 20], fov: 40 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false }}>
+                    <Canvas
+                        camera={{ position: [0, 0, 20], fov: 40 }}
+                        dpr={[1, 1.5]}
+                        gl={{ antialias: true, alpha: false }}
+                        onCreated={({ camera }) => {
+                            // Shift camera look-at down slightly to align with card center
+                            // (card sits below 72px navbar, so visual midpoint is ~36px below viewport center)
+                            camera.lookAt(0, -0.7, 0)
+                        }}
+                    >
                         <color attach="background" args={['#000000']} />
                         <fog attach="fog" args={['#000000', 22, 60]} />
                         <ambientLight intensity={0.15} />
@@ -254,7 +263,7 @@ export default function GlobeExperience({ analyser }) {
                         exit={{ opacity: 0, scale: 0.9, filter: 'blur(20px)' }}
                         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                         className="fixed inset-0 z-[200] flex items-center justify-center px-4"
-                        style={{ pointerEvents: 'none' }}
+                        style={{ pointerEvents: 'none', paddingTop: '72px' }}
                     >
                         {/* Card — pointer-events-auto so all children are clickable */}
                         <div
@@ -271,8 +280,8 @@ export default function GlobeExperience({ analyser }) {
                                 boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 60px rgba(0,209,255,0.04)',
                             }}
                         >
-                            {/* ── CORO label — bigger, stronger ── */}
-                            <div className="flex items-center gap-3 mb-5">
+                            {/* ── CORO label ── */}
+                            <div className="flex items-center gap-3 mb-4">
                                 <div className="w-8 h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(0,209,255,0.5))' }} />
                                 <span
                                     className="font-black uppercase tracking-[0.55em]"
