@@ -4,8 +4,8 @@ import { useRoomStore } from '../store/roomStore'
 import AuthModals from './AuthModals'
 
 export default function Navbar() {
-    const { isAuthed, setAuthed, setEnteredCoro } = useRoomStore()
-    const [modalType, setModalType] = useState(null) // 'login' | 'signup' | null
+    const { isAuthed, displayName, setAuthed, setEnteredCoro } = useRoomStore()
+    const [showModal, setShowModal] = useState(false)
     const navigate = useNavigate()
 
     const handleLogoClick = (e) => {
@@ -32,34 +32,28 @@ export default function Navbar() {
             {/* Auth Actions */}
             <div className="flex items-center gap-6">
                 {isAuthed ? (
-                    <button
-                        onClick={() => setAuthed(false)}
-                        className="text-white/60 hover:text-[#00D1FF] transition-colors text-sm font-medium"
-                    >
-                        Log Out
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <span className="text-white/70 text-sm font-bold">{displayName}</span>
+                        <button
+                            onClick={() => setAuthed(false, '')}
+                            className="text-white/40 hover:text-white/70 transition-colors text-xs font-medium"
+                        >
+                            Log Out
+                        </button>
+                    </div>
                 ) : (
-                    <>
-                        <button
-                            onClick={() => setModalType('login')}
-                            className="text-white/60 hover:text-white hover:drop-shadow-[0_0_8px_rgba(0,209,255,0.6)] transition-all text-sm font-semibold"
-                        >
-                            Log in
-                        </button>
-                        <button
-                            onClick={() => setModalType('signup')}
-                            className="bg-[#00D1FF] hover:bg-[#00E5FF] text-black px-6 py-2 rounded-full text-sm font-black transition-all shadow-[0_0_20px_rgba(0,209,255,0.4)] hover:shadow-[0_0_30px_rgba(0,209,255,0.6)] active:scale-95"
-                        >
-                            Sign up
-                        </button>
-                    </>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-[#00D1FF] hover:bg-[#00E5FF] text-black px-6 py-2 rounded-full text-sm font-black transition-all shadow-[0_0_20px_rgba(0,209,255,0.4)] hover:shadow-[0_0_30px_rgba(0,209,255,0.6)] active:scale-95"
+                    >
+                        Enter
+                    </button>
                 )}
             </div>
 
             <AuthModals
-                isOpen={!!modalType}
-                type={modalType}
-                onClose={() => setModalType(null)}
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
             />
         </nav>
     )

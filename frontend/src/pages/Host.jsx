@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -10,13 +10,27 @@ import ActivePrompts from '../components/ActivePrompts.jsx'
 import Timeline from '../components/Timeline.jsx'
 import SessionControls from '../components/SessionControls.jsx'
 
+function formatInputSummary(inputs) {
+  if (!inputs || typeof inputs !== 'object') return ''
+  return Object.entries(inputs)
+    .filter(([k]) => k !== 'custom_prompt')
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(', ')
+}
+
 export default function Host() {
-  const { roomId, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel } = useRoomStore()
+  const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const [showQR, setShowQR] = useState(true)
+  const timelineEndRef = useRef(null)
 
   const joinUrl = `${window.location.origin}/?room_id=${roomId}`
+
+  // Auto-scroll timeline to bottom
+  useEffect(() => {
+    timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [timeline])
 
   const handlePlay = () => {
     unlock()
@@ -43,8 +57,14 @@ export default function Host() {
               <div>
                 <p className="text-[10px] font-black text-[#00D1FF] uppercase tracking-[0.45em] drop-shadow-[0_0_8px_rgba(0,209,255,0.4)]">Active Studio Session</p>
                 <p className="flex flex-wrap items-center gap-2 text-base sm:text-lg font-bold text-white mt-0.5">
-                  Room <span className="text-[#00D1FF] font-mono tracking-widest uppercase">{roomId}</span>
-                  {isPlaying && <span className="text-green-400 text-[9px] animate-pulse font-black tracking-widest">● LIVE</span>}
+                  {roomName ? (
+                    <>
+                      {roomName} <span className="text-white/30 text-sm font-mono">({roomId})</span>
+                    </>
+                  ) : (
+                    <>Room <span className="text-[#00D1FF] font-mono tracking-widest uppercase">{roomId}</span></>
+                  )}
+                  {isPlaying && <span className="text-green-400 text-[9px] animate-pulse font-black tracking-widest">LIVE</span>}
                 </p>
               </div>
             </div>
@@ -62,7 +82,7 @@ export default function Host() {
                   : 'bg-[#00D1FF] hover:bg-[#00E5FF] text-black shadow-[0_0_20px_rgba(0,209,255,0.35)]'
                   }`}
               >
-                {isPlaying ? '⏹ Stop' : '▶ Start Stream'}
+                {isPlaying ? 'Stop' : 'Start Stream'}
               </button>
             </div>
           </div>
@@ -171,14 +191,14 @@ export default function Host() {
                 )}
               </div>
 
-              {/* 👏 Applause Meter */}
+              {/* Applause Meter */}
               <div
                 className="rounded-[2rem] px-6 py-5"
                 style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
               >
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.40em] text-[#00D1FF]">
-                    👏 Crowd Energy
+                    Crowd Energy
                   </p>
                   <span className="text-[9px] text-white/30 font-bold uppercase tracking-widest">
                     {Math.round(applauseLevel * 100)}%
@@ -216,18 +236,18 @@ export default function Host() {
                 </div>
               )}
 
-              {/* 📜 Session Story — Timeline */}
+              {/* Session Story — Timeline */}
               <div
                 className="rounded-[2rem] p-6"
                 style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4 text-[#00D1FF]">
-                  📜 Session Story
+                  Session Story
                 </p>
                 <Timeline events={timeline} />
               </div>
 
-              {/* Band Members */}
+              {/* Band Members — with display names + current inputs */}
               <div
                 className="rounded-[2rem] p-6"
                 style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
@@ -241,12 +261,18 @@ export default function Host() {
                   <div className="space-y-2">
                     {participants.map((p) => {
                       const r = ROLES[p.role]
+                      const inputSummary = formatInputSummary(currentInputs[p.role])
                       return (
                         <div key={p.user_id} className={`flex items-center gap-3 p-3 rounded-xl ${r?.bgColor || ''} border ${r?.borderColor || 'border-white/10'}`}>
                           <span className="text-lg">{r?.emoji || '🎵'}</span>
-                          <div>
-                            <p className={`text-sm font-bold ${r?.color || 'text-white'}`}>{r?.label || p.role}</p>
-                            <p className="text-xs text-white/35">{r?.description || ''}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-bold ${r?.color || 'text-white'}`}>
+                              {p.display_name || p.user_id.slice(0, 8)}
+                            </p>
+                            <p className="text-xs text-white/35">{r?.label || p.role}</p>
+                            {inputSummary && (
+                              <p className="text-[10px] text-white/30 truncate mt-0.5">{inputSummary}</p>
+                            )}
                           </div>
                         </div>
                       )

@@ -139,13 +139,16 @@ async def websocket_endpoint(websocket: WebSocket):
             # ── CREATE ROOM ──────────────────────────────────────────────────
             if msg_type == "create_room":
                 device_name = msg.get("device_name", "Unknown")
-                room = room_service.create_room(host_id=user_id, device_name=device_name)
+                room_name = msg.get("room_name", "")
+                display_name = msg.get("display_name", "")
+                room = room_service.create_room(host_id=user_id, device_name=device_name, room_name=room_name)
                 room_id = room.room_id
-                role = room_service.join_room(room_id, user_id, websocket)
+                role = room_service.join_room(room_id, user_id, websocket, display_name=display_name)
                 join_url = f"?room_id={room_id}"
                 await websocket.send_json({
                     "type": "room_created",
                     "room_id": room_id,
+                    "room_name": room_name,
                     "join_url": join_url,
                     "role": role.value if role else None,
                 })
@@ -157,10 +160,11 @@ async def websocket_endpoint(websocket: WebSocket):
             # ── JOIN ROOM ────────────────────────────────────────────────────
             elif msg_type == "join_room":
                 room_id = msg.get("room_id", "").upper()
+                display_name = msg.get("display_name", "")
                 if not room_id or room_id not in room_service.rooms:
                     await websocket.send_json({"type": "error", "message": f"Room {room_id} not found"})
                     continue
-                role = room_service.join_room(room_id, user_id, websocket)
+                role = room_service.join_room(room_id, user_id, websocket, display_name=display_name)
                 if role is None:
                     await websocket.send_json({"type": "error", "message": "Room is full (max 10 players)"})
                     continue

@@ -13,7 +13,7 @@ import EnergyControl from '../components/controls/EnergyControl.jsx'
 import { ROLES, PROMPT_HINTS } from '../lib/constants.js'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
 
-// Role selection card —————————————————————————————————————————————————
+// Role selection card
 function RoleSelectCard({ selected, onSelect }) {
   const roles = Object.values(ROLES)
   return (
@@ -43,7 +43,7 @@ function RoleSelectCard({ selected, onSelect }) {
   )
 }
 
-// Join CORO Room card (shown before joining) ——————————————————————————
+// Join CORO Room card (shown before joining)
 function JoinCard() {
   const navigate = useNavigate()
   const [joinCode, setJoinCode] = useState('')
@@ -52,6 +52,7 @@ function JoinCard() {
   const [error, setError] = useState('')
   const [userId] = useState(() => localStorage.getItem('cs_user_id') || uuidv4())
   const { joinRoom } = useWebSocket()
+  const displayName = useRoomStore((s) => s.displayName)
 
   useEffect(() => {
     localStorage.setItem('cs_user_id', userId)
@@ -64,7 +65,7 @@ function JoinCard() {
     if (!joinCode.trim() || !selectedRole) return
     setLoading(true); setError('')
     try {
-      const result = await joinRoom(joinCode.trim().toUpperCase(), userId, selectedRole)
+      const result = await joinRoom(joinCode.trim().toUpperCase(), userId, { displayName })
       if (result?.error) {
         setError(result.error)
       } else {
@@ -132,7 +133,7 @@ function JoinCard() {
             : 'bg-red-400/10 border border-red-400/20 text-red-400 animate-pulse'
           }`}
         >
-          {isFull ? '🚫' : '⚠️'} {error}
+          {isFull ? '' : ''} {error}
         </div>
       )}
 
@@ -143,15 +144,23 @@ function JoinCard() {
         className="mt-6 w-full py-4 rounded-2xl font-black text-black text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: '#00D1FF', boxShadow: '0 12px 36px rgba(0,209,255,0.28)' }}
       >
-        {loading ? 'Joining...' : 'Join Session →'}
+        {loading ? 'Joining...' : 'Join Session'}
       </button>
     </div>
   )
 }
 
-// ─── Main Guest page ─────────────────────────────────────────────────────────
+function formatInputSummary(inputs) {
+  if (!inputs || typeof inputs !== 'object') return ''
+  return Object.entries(inputs)
+    .filter(([k]) => k !== 'custom_prompt')
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(', ')
+}
+
+// ─── Main Guest page
 export default function Guest() {
-  const { role, roomId, userId, isPlaying, activePrompts } = useRoomStore()
+  const { role, roomId, userId, isPlaying, activePrompts, participants, currentInputs } = useRoomStore()
   const { unlock } = useAudioPlayer()
   const { send, sendInput, addListener } = useWebSocket()
   const [tab, setTab] = useState('studio')
@@ -240,6 +249,8 @@ export default function Guest() {
   const inRoom = !!(role && roomId)
   const roleInfo = ROLES[role]
 
+  // Other participants (exclude self)
+  const otherParticipants = participants.filter(p => p.user_id !== userId)
 
   return (
     <div className="min-h-screen flex flex-col px-4 sm:px-6 max-w-2xl mx-auto pt-20 pb-12 pointer-events-auto">
@@ -308,7 +319,7 @@ export default function Guest() {
                   }}
                 >
                   <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(0,209,255,0.65)' }}>
-                    ✨ Describe what you want to hear
+                    Describe what you want to hear
                   </p>
                   <div className="flex gap-2">
                     <input
@@ -348,6 +359,36 @@ export default function Guest() {
                 </div>
               </div>
 
+              {/* Band Activity — what other roles are doing */}
+              {otherParticipants.length > 0 && (
+                <div
+                  className="rounded-[1.25rem] p-5"
+                  style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0,209,255,0.14)' }}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60 mb-3">Band Activity</p>
+                  <div className="space-y-2">
+                    {otherParticipants.map((p) => {
+                      const pRoleInfo = ROLES[p.role]
+                      const inputSummary = formatInputSummary(currentInputs[p.role])
+                      return (
+                        <div key={p.user_id} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                          <span className="text-base">{pRoleInfo?.emoji || '🎵'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-white/70">
+                              {p.display_name || p.user_id.slice(0, 8)}
+                              <span className="text-white/30 font-normal ml-2">{pRoleInfo?.label || p.role}</span>
+                            </p>
+                            {inputSummary && (
+                              <p className="text-[10px] text-white/40 truncate">{inputSummary}</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Active prompts mini display */}
               {activePrompts.length > 0 && (
                 <div className="glass-card p-6">
@@ -368,7 +409,7 @@ export default function Guest() {
                 style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.40)' }}>👏 Crowd Energy</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.40)' }}>Crowd Energy</p>
                   <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.22)' }}>Share your mic to energise the room</p>
                 </div>
                 <button
@@ -379,7 +420,7 @@ export default function Guest() {
                     : { background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }
                   }
                 >
-                  {micEnabled ? '🎤 Stop' : '🎤 Enable'}
+                  {micEnabled ? 'Stop' : 'Enable'}
                 </button>
               </div>
 
@@ -403,7 +444,7 @@ export default function Guest() {
                     onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
                     onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
                   >
-                    💥 DROP
+                    DROP
                   </button>
                   {dropProgress > 0 && (
                     <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
