@@ -28,6 +28,9 @@ export const useRoomStore = create((set) => ({
   influenceWeights: {},
   geminiReasoning: '',
   participants: [],
+  timeline: [],
+  applauseLevel: 0,
+  dropProgress: 0,
 
   setEnteredCoro: (val) => {
     sessionStorage.setItem('hasEnteredCoro', val)
@@ -40,6 +43,9 @@ export const useRoomStore = create((set) => ({
 
   setConnected: (val) => set({ isConnected: val }),
   setPlaying: (val) => set({ isPlaying: val }),
+  setApplauseLevel: (val) => set({ applauseLevel: val }),
+  setDropProgress: (val) => set({ dropProgress: val }),
+  setTimeline: (val) => set({ timeline: val }),
 
   applyStateUpdate: (msg) =>
     set({
@@ -51,6 +57,8 @@ export const useRoomStore = create((set) => ({
       influenceWeights: msg.influence_weights || {},
       geminiReasoning: msg.gemini_reasoning || '',
       participants: msg.participants || [],
+      timeline: msg.timeline || [],
+      applauseLevel: msg.applause_level || 0,
     }),
 
   reset: () => {
@@ -67,6 +75,9 @@ export const useRoomStore = create((set) => ({
       currentInputs: {},
       influenceWeights: {},
       participants: [],
+      timeline: [],
+      applauseLevel: 0,
+      dropProgress: 0,
     })
   },
 }))

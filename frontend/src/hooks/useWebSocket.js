@@ -86,6 +86,16 @@ class WebSocketManager {
       case 'music_stopped':
         this.store?.setPlaying(false)
         break
+      case 'drop_progress':
+        this.store?.setDropProgress(msg.count)
+        break
+      case 'drop_triggered':
+        this.store?.setDropProgress(0)
+        // Trigger visual/haptic effects
+        document.body.classList.add('drop-flash')
+        navigator.vibrate?.([200, 100, 200])
+        setTimeout(() => document.body.classList.remove('drop-flash'), 1000)
+        break
       case 'error':
         console.error('[WS] Server error:', msg.message)
         break

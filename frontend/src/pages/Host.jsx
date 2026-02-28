@@ -7,9 +7,10 @@ import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
+import Timeline from '../components/Timeline.jsx'
 
 export default function Host() {
-  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning, participants } = useRoomStore()
+  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const [showQR, setShowQR] = useState(true)
@@ -114,23 +115,48 @@ export default function Host() {
             </div>
           )}
 
+          {/* Applause Meter */}
+          <div className="card">
+            <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
+              👏 Crowd Energy
+            </p>
+            <div className="w-full bg-cs-bg rounded-full h-4 overflow-hidden border border-cs-border">
+              <div
+                className="h-full bg-gradient-to-r from-green-500 via-yellow-400 to-red-500 transition-all duration-300"
+                style={{
+                  width: `${applauseLevel * 100}%`,
+                  boxShadow: applauseLevel > 0.7 ? '0 0 15px rgba(239,68,68,0.5)' : 'none'
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-cs-muted mt-2 text-right font-mono">{Math.round(applauseLevel * 100)}% SUSTAINED APPLAUSE</p>
+          </div>
+
+          {/* Session Story — Timeline */}
+          <div className="glass-card p-8 group">
+            <p className="text-[10px] text-[#00D1FF]/60 font-black uppercase tracking-[0.3em] mb-4">
+              📜 Session Story
+            </p>
+            <Timeline events={timeline} />
+          </div>
+
           {/* Band Members */}
           <div className="card">
             <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
               Band Members
             </p>
             {participants.length === 0 ? (
-              <p className="text-cs-muted text-sm">Waiting for players...</p>
+              <p className="text-cs-muted text-sm italic">Waiting for players...</p>
             ) : (
               <div className="space-y-2">
                 {participants.map((p) => {
                   const roleInfo = ROLES[p.role]
                   return (
-                    <div key={p.user_id} className={`flex items-center gap-3 p-2 rounded-lg ${roleInfo?.bgColor || ''} border ${roleInfo?.borderColor || 'border-cs-border'}`}>
+                    <div key={p.user_id} className={`flex items-center gap-3 p-2.5 rounded-xl ${roleInfo?.bgColor || ''} border ${roleInfo?.borderColor || 'border-white/5'}`}>
                       <span className="text-lg">{roleInfo?.emoji || '🎵'}</span>
                       <div>
                         <p className={`text-sm font-bold ${roleInfo?.color || 'text-white'}`}>{roleInfo?.label || p.role}</p>
-                        <p className="text-xs text-cs-muted">{roleInfo?.description || ''}</p>
+                        <p className="text-xs text-white/30 uppercase tracking-tighter">{roleInfo?.description || ''}</p>
                       </div>
                     </div>
                   )
