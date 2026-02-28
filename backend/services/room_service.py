@@ -11,6 +11,8 @@ from models.schemas import RoomState, WeightedPrompt, Role
 
 
 class RoomService:
+    MAX_USERS_PER_ROOM = 10
+
     def __init__(self):
         # room_id → RoomState
         self.rooms: Dict[str, RoomState] = {}
@@ -63,6 +65,13 @@ class RoomService:
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
         if room_id not in self.rooms:
+            return None
+
+        room_roles = self.user_roles.get(room_id, {})
+
+        # Allow reconnecting users through, but cap new joins
+        if user_id not in room_roles and len(room_roles) >= self.MAX_USERS_PER_ROOM:
+            print(f"[Room] Room {room_id} is full ({self.MAX_USERS_PER_ROOM} users) — rejecting {user_id}")
             return None
 
         self.connections[room_id].add(ws)
@@ -189,6 +198,8 @@ class RoomService:
 
             print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
             await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            # Clear consumed inputs so stale ones don't re-trigger Gemini
+            room.current_inputs = {}
 
 
 # Singleton

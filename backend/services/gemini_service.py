@@ -20,6 +20,16 @@ weighted prompts that:
 3. Maintain energy continuity — don't flip completely from one style to another in one step
 4. Keep prompts descriptive: include genre, instruments, mood, and energy level
 
+CRITICAL CONTINUITY RULES:
+- New prompts MUST share >=60% of the words/instruments from the previous prompts.
+  Only ADD or REMOVE one sonic element at a time (e.g., add a cello layer, or swap hi-hats for brushes).
+  Never replace all prompts at once — evolve them gradually.
+- BPM changes must be <=10 per tick. If the crowd wants 160 but current is 100, return 110.
+- density and brightness changes must be <=0.15 per tick for smooth transitions.
+- When no new inputs arrive, return the EXACT previous prompts unchanged.
+- Think of yourself as a DJ doing live crossfading — never hard-cut between styles.
+- If a user sends a custom_prompt, weave it into the existing prompts rather than replacing them.
+
 Always return ONLY valid JSON — no markdown, no backticks, no explanation outside JSON.
 Exact format:
 {
@@ -160,14 +170,19 @@ class GeminiService:
     ) -> str:
         lines = ["Current crowd inputs:"]
         for role, payload in inputs.items():
-            lines.append(f"  - {role}: {payload}")
+            # Separate custom_prompt from standard payload fields
+            standard_payload = {k: v for k, v in payload.items() if k != "custom_prompt"}
+            if standard_payload:
+                lines.append(f"  - {role}: {standard_payload}")
+            if "custom_prompt" in payload:
+                lines.append(f"  - {role} custom request: \"{payload['custom_prompt']}\"")
         lines.append(f"\nCurrent music state: BPM={bpm}, density={density:.2f}, brightness={brightness:.2f}")
         if previous:
             prev_texts = [f'"{p.text}" (weight {p.weight:.2f})' for p in previous.prompts]
-            lines.append(f"\nPrevious prompts (maintain continuity from these):")
+            lines.append(f"\nPrevious prompts (YOU MUST evolve from these, keeping >=60% of content):")
             for t in prev_texts:
                 lines.append(f"  - {t}")
-        lines.append("\nSynthesize 2-3 new Lyria weighted prompts that smoothly evolve from the previous ones.")
+        lines.append("\nSynthesize 2-3 new Lyria weighted prompts that smoothly evolve from the previous ones. Do NOT replace everything — only adjust one element at a time.")
         return "\n".join(lines)
 
 
