@@ -23,6 +23,7 @@ export default function DropButton({ userId, roomId }) {
 
     // Shared room-wide vote progress
     const [dropProgress, setDropProgress] = useState(0)
+    const [neededVotes, setNeededVotes] = useState(3)   // dynamic — set from server messages
 
     // Incoming drop countdown (server-sourced via drop_incoming.in_seconds)
     const [dropIncoming, setDropIncoming] = useState(false)
@@ -46,11 +47,13 @@ export default function DropButton({ userId, roomId }) {
         const cleanup = addListener((msg) => {
             if (msg.type === 'drop_progress') {
                 setDropProgress(msg.count ?? 0)
+                if (msg.needed) setNeededVotes(msg.needed)
             }
 
             if (msg.type === 'drop_incoming') {
-                // 3 votes confirmed — show 3/3, start countdown from server value
-                setDropProgress(msg.count ?? 3)
+                // All votes confirmed — show X/X, start countdown from server value
+                setDropProgress(msg.needed ?? msg.count ?? neededVotes)
+                if (msg.needed) setNeededVotes(msg.needed)
                 setDropIncoming(true)
                 let sec = msg.in_seconds ?? 3
                 setDropIncomingSeconds(sec)
@@ -70,11 +73,13 @@ export default function DropButton({ userId, roomId }) {
             }
 
             if (msg.type === 'drop_reset') {
+                if (msg.needed) setNeededVotes(msg.needed)
                 resetState()
             }
 
             // Server-side duplicate guard
             if (msg.type === 'drop_already_voted') {
+                if (msg.needed) setNeededVotes(msg.needed)
                 setHasVoted(true)
             }
         })
@@ -156,18 +161,18 @@ export default function DropButton({ userId, roomId }) {
                 {buttonLabel}
             </button>
 
-            {/* Vote progress bar (1/3, 2/3, 3/3) */}
-            {dropProgress > 0 && !dropIncoming && (
+            {/* Vote progress bar — shown during voting AND during countdown (X/X) */}
+            {dropProgress > 0 && (
                 <div className="mt-3 space-y-1.5">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-orange-400/80 px-0.5">
                         <span>Votes</span>
-                        <span>{dropProgress} / 3</span>
+                        <span>{dropProgress} / {neededVotes}</span>
                     </div>
                     <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                         <div
                             className="h-full rounded-full transition-all duration-300"
                             style={{
-                                width: `${(dropProgress / 3) * 100}%`,
+                                width: `${Math.min((dropProgress / neededVotes) * 100, 100)}%`,
                                 background: 'linear-gradient(to right, #f97316, #ef4444)',
                                 boxShadow: '0 0 8px rgba(239,68,68,0.6)',
                             }}

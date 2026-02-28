@@ -296,18 +296,30 @@ async def websocket_endpoint(websocket: WebSocket):
                 if not room_id:
                     continue
                 result = room_service.record_drop(room_id, connection_id, user_id)
+                needed = room_service.get_drop_threshold(room_id)
 
                 if result == "already_voted":
                     await websocket.send_json({
                         "type": "drop_already_voted",
                         "count": room_service.get_drop_vote_count(room_id),
-                        "needed": 3,
+                        "needed": needed,
                     })
 
                 elif result == "triggered":
-                    # How many seconds before the Lyria update fires.
-                    # Frontend reads this from the message — not hardcoded there.
+                    # Frontend reads in_seconds from this message — not hardcoded there.
                     DROP_DELAY = 3
+                    # Always broadcast drop_incoming unconditionally so all clients
+                    # see the countdown even if room lookup fails for Lyria step.
+                    await room_service.broadcast_json(room_id, {
+                        "type": "drop_incoming",
+                        "in_seconds": DROP_DELAY,
+                        "count": needed,
+                        "needed": needed,
+                    })
+                    # Schedule Lyria update + drop_triggered after countdown.
+                    # drop_triggered is ALWAYS sent after the delay regardless of
+                    # whether the Lyria call succeeds (separate try/except).
+                    room = room_service.rooms.get(room_id)
                     from google.genai import types as drop_types
                     drop_prompts = [
                         drop_types.WeightedPrompt(
@@ -319,17 +331,9 @@ async def websocket_endpoint(websocket: WebSocket):
                             weight=0.3
                         ),
                     ]
-                    room = room_service.rooms.get(room_id)
-                    if room:
-                        # Tell all clients the drop is coming (they count down from in_seconds)
-                        await room_service.broadcast_json(room_id, {
-                            "type": "drop_incoming",
-                            "in_seconds": DROP_DELAY,
-                            "count": 3,
-                        })
-                        # Fire Lyria update after the countdown, then confirm to clients
-                        async def _fire_drop(rid=room_id, r=room, dp=drop_prompts):
-                            await asyncio.sleep(DROP_DELAY)
+                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts, delay=DROP_DELAY):
+                        await asyncio.sleep(delay)
+                        if r:
                             try:
                                 await lyria_service.update_prompts(
                                     room_id=rid,
@@ -338,29 +342,32 @@ async def websocket_endpoint(websocket: WebSocket):
                                     density=1.0,
                                     brightness=0.3,
                                 )
-                                await room_service.broadcast_json(rid, {
-                                    "type": "drop_triggered",
-                                    "message": "🔥 DROP!"
-                                })
                             except Exception as e:
-                                print(f"[WS] Drop fire failed for room {rid}: {e}")
-                        asyncio.create_task(_fire_drop())
+                                print(f"[WS] Drop Lyria update failed (non-fatal): {e}")
+                        # Always broadcast drop_triggered so UI resets
+                        await room_service.broadcast_json(rid, {
+                            "type": "drop_triggered",
+                            "message": "🔥 DROP!"
+                        })
+                    asyncio.create_task(_fire_drop())
 
                 elif result == "registered":
                     count = room_service.get_drop_vote_count(room_id)
                     await room_service.broadcast_json(room_id, {
                         "type": "drop_progress",
                         "count": count,
-                        "needed": 3,
+                        "needed": needed,
                     })
-                    # On first vote, start 5-second expiry window
+                    # On first vote, start 10-second expiry window
                     if count == 1:
                         async def _expire_drop(rid=room_id):
-                            await asyncio.sleep(5.0)
+                            await asyncio.sleep(10.0)
                             if room_service.get_drop_vote_count(rid) > 0:
                                 room_service.reset_drop_votes(rid)
+                                n = room_service.get_drop_threshold(rid)
                                 await room_service.broadcast_json(rid, {
                                     "type": "drop_reset",
+                                    "needed": n,
                                     "message": "Not enough votes — try again",
                                 })
                         asyncio.create_task(_expire_drop())
