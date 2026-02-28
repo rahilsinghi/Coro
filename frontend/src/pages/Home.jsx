@@ -91,7 +91,7 @@ export default function Home() {
     setError('')
     try {
       await createRoom(userId, getDeviceName(), { roomName: sessionName.trim(), displayName })
-      navigate('/host')
+      navigate('/studio')
     } catch (e) {
       setError('Failed to create room.')
     } finally {
