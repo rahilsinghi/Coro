@@ -16,45 +16,7 @@ export function useWebSocket() {
     setRoom,
   } = useRoomStore()
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
-
-    const ws = new WebSocket(WS_URL)
-    ws.binaryType = 'arraybuffer'
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      console.log('[WS] Connected')
-      setConnected(true)
-    }
-
-    ws.onclose = () => {
-      console.log('[WS] Disconnected — reconnecting in 2s...')
-      setConnected(false)
-      reconnectTimerRef.current = setTimeout(connect, 2000)
-    }
-
-    ws.onerror = (err) => {
-      console.error('[WS] Error:', err)
-    }
-
-    ws.onmessage = (event) => {
-      // Binary = audio chunk
-      if (event.data instanceof ArrayBuffer) {
-        enqueueAudio(event.data)
-        return
-      }
-
-      // Text = JSON message
-      try {
-        const msg = JSON.parse(event.data)
-        handleMessage(msg)
-      } catch (e) {
-        console.warn('[WS] Could not parse message:', event.data)
-      }
-    }
-  }, [enqueueAudio, setConnected])
-
+  // --- handleMessage (keep existing logic) ---
   const handleMessage = useCallback((msg) => {
     console.log('[WS] ←', msg.type, msg)
     switch (msg.type) {
@@ -81,6 +43,52 @@ export function useWebSocket() {
         break
     }
   }, [applyStateUpdate, setPlaying])
+
+  // --- Refs for callbacks so connect() stays stable ---
+  const handleMessageRef = useRef(handleMessage)
+  useEffect(() => { handleMessageRef.current = handleMessage }, [handleMessage])
+
+  const enqueueAudioRef = useRef(enqueueAudio)
+  useEffect(() => { enqueueAudioRef.current = enqueueAudio }, [enqueueAudio])
+
+  // --- connect: stable (empty deps), uses refs for callbacks ---
+  const connect = useCallback(() => {
+    // Guard: don't open if already open or connecting
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) return
+
+    const ws = new WebSocket(WS_URL)
+    ws.binaryType = 'arraybuffer'
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      console.log('[WS] Connected')
+      setConnected(true)
+    }
+
+    ws.onclose = () => {
+      console.log('[WS] Disconnected — reconnecting in 2s...')
+      setConnected(false)
+      reconnectTimerRef.current = setTimeout(connect, 2000)
+    }
+
+    ws.onerror = (err) => {
+      console.error('[WS] Error:', err)
+    }
+
+    ws.onmessage = (event) => {
+      if (event.data instanceof ArrayBuffer) {
+        enqueueAudioRef.current(event.data)
+        return
+      }
+      try {
+        const msg = JSON.parse(event.data)
+        handleMessageRef.current(msg)
+      } catch (e) {
+        console.warn('[WS] Could not parse message:', event.data)
+      }
+    }
+  }, [])  // Empty deps — stable reference
 
   const send = useCallback((message) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

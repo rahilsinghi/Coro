@@ -18,8 +18,8 @@ class RoomService:
         self.connections: Dict[str, Set[WebSocket]] = {}
         # room_id → user_id → WebSocket
         self.user_sockets: Dict[str, Dict[str, WebSocket]] = {}
-        # user_id → role
-        self.user_roles: Dict[str, Role] = {}
+        # room_id → user_id → role
+        self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
         # room_id → asyncio task for tick loop
@@ -40,6 +40,7 @@ class RoomService:
         self.rooms[room_id] = room
         self.connections[room_id] = set()
         self.user_sockets[room_id] = {}
+        self.user_roles[room_id] = {}
         return room
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
@@ -49,8 +50,15 @@ class RoomService:
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
+        room_roles = self.user_roles.get(room_id, {})
+
+        # If user already has a role in this room (reconnect), reuse it
+        if user_id in room_roles:
+            print(f"[Room] User {user_id} reconnected with existing role {room_roles[user_id].value}")
+            return room_roles[user_id]
+
         # Assign next available role
-        taken_roles = set(self.user_roles.values())
+        taken_roles = set(room_roles.values())
         assigned_role = None
         for role in self._role_queue:
             if role not in taken_roles:
@@ -60,7 +68,8 @@ class RoomService:
         if not assigned_role:
             assigned_role = Role.ENERGY
 
-        self.user_roles[user_id] = assigned_role
+        self.user_roles.setdefault(room_id, {})[user_id] = assigned_role
+        print(f"[Room] Assigned {assigned_role.value} to user {user_id} in room {room_id}")
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
@@ -68,12 +77,14 @@ class RoomService:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        self.user_roles.pop(user_id, None)
+        # NOTE: Do NOT pop user_roles here — role persists across reconnects
+        # Roles are only cleaned up when the room is destroyed
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
             return
         self.rooms[room_id].current_inputs[role.value] = payload
+        print(f"[Room] Input from {role.value}: {payload}")
 
     def update_after_arbitration(self, room_id: str, prompts, bpm: int, density: float, brightness: float):
         """Called by the tick loop after Gemini returns arbitration results."""
@@ -145,8 +156,18 @@ class RoomService:
             if room_id not in self.rooms:
                 break
             room = self.rooms[room_id]
-            if room.is_playing:
-                await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            if not room.is_playing:
+                continue
+
+            # Apply energy controller inputs directly to room state
+            energy_input = room.current_inputs.get("energy", {})
+            if "density" in energy_input:
+                room.density = float(energy_input["density"])
+            if "brightness" in energy_input:
+                room.brightness = float(energy_input["brightness"])
+
+            print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
+            await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
 
 
 # Singleton
