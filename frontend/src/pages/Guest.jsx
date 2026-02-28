@@ -12,6 +12,8 @@ import InstrumentGrid from '../components/controls/InstrumentGrid.jsx'
 import EnergyControl from '../components/controls/EnergyControl.jsx'
 import { ROLES, PROMPT_HINTS } from '../lib/constants.js'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
+import MiniPromptBar from '../components/MiniPromptBar.jsx'
+import PlayBar from '../components/PlayBar.jsx'
 
 // Role selection card
 function RoleSelectCard({ selected, onSelect }) {
@@ -162,7 +164,9 @@ function formatInputSummary(inputs) {
 export default function Guest() {
   const { role, roomId, userId, isPlaying, activePrompts, participants, currentInputs, dropProgress } = useRoomStore()
   const { unlock } = useAudioPlayer()
-  const { send, sendInput, addListener } = useWebSocket()
+  const { send, sendInput, addListener, leaveRoom } = useWebSocket()
+  const clearRoom = useRoomStore((s) => s.clearRoom)
+  const navigate = useNavigate()
   const [tab, setTab] = useState('studio')
 
   // UI state
@@ -230,6 +234,13 @@ export default function Guest() {
     }
   }
 
+  const handleLeaveRoom = () => {
+    if (window.confirm("Leave this session?")) {
+      leaveRoom(userId, roomId)
+      navigate('/studio')
+    }
+  }
+
   const inRoom = !!(role && roomId)
   const roleInfo = ROLES[role]
 
@@ -252,198 +263,220 @@ export default function Guest() {
           )}
         </div>
         {inRoom && (
-          isPlaying
-            ? <div className="flex items-center gap-2 bg-[#00D1FF]/10 px-4 py-1.5 rounded-full border border-[#00D1FF]/20">
-              <span className="text-[#00D1FF] text-[8px] font-black uppercase tracking-widest animate-pulse">Live</span>
-            </div>
-            : <span className="text-white/20 text-[8px] font-black uppercase tracking-widest bg-white/5 px-4 py-1.5 rounded-full">Syncing...</span>
+          <div className="flex items-center gap-3">
+            {isPlaying
+              ? <div className="flex items-center gap-2 bg-[#00D1FF]/10 px-4 py-1.5 rounded-full border border-[#00D1FF]/20">
+                <span className="text-[#00D1FF] text-[8px] font-black uppercase tracking-widest animate-pulse">Live</span>
+              </div>
+              : <span className="text-white/20 text-[8px] font-black uppercase tracking-widest bg-white/5 px-4 py-1.5 rounded-full">Syncing...</span>
+            }
+            <button
+              onClick={handleLeaveRoom}
+              className="p-2 rounded-full bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 border border-white/10 hover:border-red-500/20 transition-all active:scale-90"
+              title="Leave Room"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            </button>
+          </div>
         )}
       </div>
 
-      {/* ── Tab Switcher ── */}
-      <TabSwitcher active={tab} onChange={setTab} />
+      {/* ── CONTENT ── */}
+      <div className="flex-1 mt-4">
 
-      {/* ── STUDIO TAB ── */}
-      {tab === 'studio' && (
-        <>
-          {!inRoom ? (
-            /* Join card — shown before entering a room */
-            <JoinCard />
-          ) : (
-            /* In-room controls */
-            <div className="flex flex-col gap-4">
-              {/* Role card */}
-              <RoleCard role={roleInfo} />
+        {/* ── STUDIO TAB ── */}
+        {tab === 'studio' && (
+          <>
+            {!inRoom ? (
+              /* Join card — shown before entering a room */
+              <JoinCard />
+            ) : (
+              /* In-room controls */
+              <div className="flex flex-col gap-4">
+                {/* Role card */}
+                <RoleCard role={roleInfo} />
 
-              {/* Waiting indicator */}
-              {!isPlaying && (
-                <div className="flex items-center justify-center gap-2 text-white/40 text-sm animate-pulse">
-                  <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.6)]" />
-                  Waiting for host to start music...
-                </div>
-              )}
-
-              {/* Role controls */}
-              <div className="space-y-4">
-                {role === 'drummer' && <BPMSlider />}
-                {role === 'vibe_setter' && <MoodInput />}
-                {role === 'genre_dj' && <GenreGrid />}
-                {role === 'instrumentalist' && <InstrumentGrid />}
-                {role === 'energy' && <EnergyControl />}
-
-                {/* Free-text custom prompt */}
-                <div
-                  className="flex flex-col gap-3"
-                  style={{
-                    background: 'rgba(0,12,30,0.55)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(0,209,255,0.14)',
-                    borderRadius: '1.25rem',
-                    padding: '1rem 1.25rem',
-                  }}
-                >
-                  <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(0,209,255,0.65)' }}>
-                    Describe what you want to hear
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={PROMPT_HINTS[role]}
-                      className="flex-1 text-sm text-white outline-none"
-                      style={{
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        borderRadius: '0.75rem',
-                        padding: '0.6rem 0.9rem',
-                        color: '#fff',
-                      }}
-                      onFocus={e => e.target.style.borderColor = '#00D1FF'}
-                      onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.target.value.trim()) {
-                          sendInput(userId, roomId, role, { custom_prompt: e.target.value.trim() })
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                    <button
-                      className="font-black text-black text-xs rounded-xl px-4 active:scale-95 transition-transform"
-                      style={{ background: '#00D1FF', boxShadow: '0 0 14px rgba(0,209,255,0.30)' }}
-                      onClick={(e) => {
-                        const input = e.currentTarget.previousSibling
-                        if (input.value.trim()) {
-                          sendInput(userId, roomId, role, { custom_prompt: input.value.trim() })
-                          input.value = ''
-                        }
-                      }}
-                    >
-                      Send
-                    </button>
+                {/* Waiting indicator */}
+                {!isPlaying && (
+                  <div className="flex items-center justify-center gap-2 text-white/40 text-sm animate-pulse">
+                    <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.6)]" />
+                    Waiting for host to start music...
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Band Activity — what other roles are doing */}
-              {otherParticipants.length > 0 && (
-                <div
-                  className="rounded-[1.25rem] p-5"
-                  style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0,209,255,0.14)' }}
-                >
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60 mb-3">Band Activity</p>
-                  <div className="space-y-2">
-                    {otherParticipants.map((p) => {
-                      const pRoleInfo = ROLES[p.role]
-                      const inputSummary = formatInputSummary(currentInputs[p.role])
-                      return (
-                        <div key={p.user_id} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.03] border border-white/5">
-                          <span className="text-base">{pRoleInfo?.emoji || '🎵'}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-white/70">
-                              {p.display_name || p.user_id.slice(0, 8)}
-                              <span className="text-white/30 font-normal ml-2">{pRoleInfo?.label || p.role}</span>
-                            </p>
-                            {inputSummary && (
-                              <p className="text-[10px] text-white/40 truncate">{inputSummary}</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Active prompts mini display */}
-              {activePrompts.length > 0 && (
-                <div className="glass-card p-6">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60 mb-4">Master Audio Stream</p>
-                  <div className="flex flex-wrap gap-2">
-                    {activePrompts.map((p, i) => (
-                      <span key={i} className="text-[10px] font-bold bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-white/70 uppercase tracking-wider">
-                        {p.text}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── APPLAUSE MIC TOGGLE ── */}
-              <div
-                className="flex items-center justify-between px-5 py-4 rounded-2xl"
-                style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.40)' }}>Crowd Energy</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.22)' }}>Share your mic to energise the room</p>
-                </div>
-                <button
-                  onClick={toggleMic}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
-                  style={micEnabled
-                    ? { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' }
-                    : { background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }
-                  }
-                >
-                  {micEnabled ? 'Stop' : 'Enable'}
-                </button>
-              </div>
-
-              {/* ── DROP BUTTON ── */}
-              {isPlaying && (
-                <div className="relative mt-2">
-                  {/* Shockwave ring */}
-                  {showShock && (
-                    <div
-                      className="shockwave absolute inset-0 rounded-2xl pointer-events-none"
-                      style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.45) 0%, transparent 70%)' }}
-                    />
-                  )}
-                  <button
-                    onClick={handleDrop}
-                    className="w-full py-6 rounded-2xl text-white text-2xl font-black uppercase tracking-widest transition-transform active:scale-95"
-                    style={{
-                      background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
-                      boxShadow: '0 0 30px rgba(239,68,68,0.50)',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
-                    onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
+                {/* BAND STAGE — moved up below status line */}
+                {participants.length > 0 && (
+                  <div
+                    className="rounded-[1.25rem] p-5"
+                    style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0,209,255,0.14)' }}
                   >
-                    DROP
-                  </button>
-                  {dropProgress > 0 && (
-                    <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
-                      {dropProgress}/3 ready...
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60">BAND STAGE</p>
+                      <div className="bg-[#00D1FF]/10 px-2 py-0.5 rounded border border-[#00D1FF]/20">
+                        <p className="text-[8px] font-black text-[#00D1FF] uppercase tracking-widest leading-none mt-[1px]">
+                          {participants.length} {participants.length === 1 ? 'PLAYER' : 'PLAYERS'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {participants.map((p) => {
+                        const pRoleInfo = ROLES[p.role]
+                        const inputSummary = formatInputSummary(currentInputs[p.role])
+                        const isSelf = p.user_id === userId
+                        return (
+                          <div key={p.user_id} className={`flex items-center gap-3 p-2 rounded-lg border transition-all ${isSelf ? 'bg-[#00D1FF]/5 border-[#00D1FF]/20 shadow-[0_0_10px_rgba(0,209,255,0.05)]' : 'bg-white/[0.03] border-white/5'}`}>
+                            <span className="text-base">{pRoleInfo?.emoji || '🎵'}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white/70">
+                                {p.display_name || p.user_id.slice(0, 8)}
+                                {isSelf && <span className="ml-1 text-[8px] text-[#00D1FF] opacity-60">(YOU)</span>}
+                                <span className="text-white/30 font-normal ml-2">{pRoleInfo?.label || p.role}</span>
+                              </p>
+                              {inputSummary && (
+                                <p className="text-[10px] text-white/40 truncate">{inputSummary}</p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
-      {/* ── QUICK ACTIONS TAB ── */}
-      {tab === 'quick-actions' && <QuickActionsPanel />}
+                {/* Role controls */}
+                <div className="space-y-4">
+                  {role === 'drummer' && <BPMSlider />}
+                  {role === 'vibe_setter' && <MoodInput />}
+                  {role === 'genre_dj' && <GenreGrid />}
+                  {role === 'instrumentalist' && <InstrumentGrid />}
+                  {role === 'energy' && <EnergyControl />}
+
+                  {/* Free-text custom prompt */}
+                  <div
+                    className="flex flex-col gap-3"
+                    style={{
+                      background: 'rgba(0,12,30,0.55)',
+                      backdropFilter: 'blur(16px)',
+                      border: '1px solid rgba(0,209,255,0.14)',
+                      borderRadius: '1.25rem',
+                      padding: '1rem 1.25rem',
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(0,209,255,0.65)' }}>
+                      Describe what you want to hear
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder={PROMPT_HINTS[role]}
+                        className="flex-1 text-sm text-white outline-none"
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.10)',
+                          borderRadius: '0.75rem',
+                          padding: '0.6rem 0.9rem',
+                          color: '#fff',
+                        }}
+                        onFocus={e => e.target.style.borderColor = '#00D1FF'}
+                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            sendInput(userId, roomId, role, { custom_prompt: e.target.value.trim() })
+                            e.target.value = ''
+                          }
+                        }}
+                      />
+                      <button
+                        className="font-black text-black text-xs rounded-xl px-4 active:scale-95 transition-transform"
+                        style={{ background: '#00D1FF', boxShadow: '0 0 14px rgba(0,209,255,0.30)' }}
+                        onClick={(e) => {
+                          const input = e.currentTarget.previousSibling
+                          if (input.value.trim()) {
+                            sendInput(userId, roomId, role, { custom_prompt: input.value.trim() })
+                            input.value = ''
+                          }
+                        }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active prompts mini display */}
+                {activePrompts.length > 0 && (
+                  <div className="glass-card p-6">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60 mb-4">Master Audio Stream</p>
+                    <div className="flex flex-wrap gap-2">
+                      {activePrompts.map((p, i) => (
+                        <span key={i} className="text-[10px] font-bold bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-white/70 uppercase tracking-wider">
+                          {p.text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── APPLAUSE MIC TOGGLE ── */}
+                <div
+                  className="flex items-center justify-between px-5 py-4 rounded-2xl"
+                  style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.40)' }}>Crowd Energy</p>
+                    <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.22)' }}>Share your mic to energise the room</p>
+                  </div>
+                  <button
+                    onClick={toggleMic}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                    style={micEnabled
+                      ? { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' }
+                      : { background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }
+                    }
+                  >
+                    {micEnabled ? 'Stop' : 'Enable'}
+                  </button>
+                </div>
+
+                {/* ── DROP BUTTON ── */}
+                {isPlaying && (
+                  <div className="relative mt-2">
+                    {/* Shockwave ring */}
+                    {showShock && (
+                      <div
+                        className="shockwave absolute inset-0 rounded-2xl pointer-events-none"
+                        style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.45) 0%, transparent 70%)' }}
+                      />
+                    )}
+                    <button
+                      onClick={handleDrop}
+                      className="w-full py-6 rounded-2xl text-white text-2xl font-black uppercase tracking-widest transition-transform active:scale-95"
+                      style={{
+                        background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
+                        boxShadow: '0 0 30px rgba(239,68,68,0.50)',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
+                      onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
+                    >
+                      DROP
+                    </button>
+                    {dropProgress > 0 && (
+                      <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
+                        {dropProgress}/3 ready...
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── QUICK ACTIONS TAB ── */}
+        {tab === 'quick-actions' && <QuickActionsPanel />}
+        {inRoom && <MiniPromptBar />}
+        {inRoom && <PlayBar />}
+      </div>
     </div>
   )
 }

@@ -7,7 +7,15 @@ import Guest from './pages/Guest.jsx'
 import GlobeExperience from './components/GlobeExperience.jsx'
 import Navbar from './components/Navbar.jsx'
 
+import { v4 as uuidv4 } from 'uuid'
+
 export default function App() {
+  React.useEffect(() => {
+    if (!localStorage.getItem('cs_user_id')) {
+      localStorage.setItem('cs_user_id', uuidv4())
+    }
+  }, [])
+
   return (
     <BrowserRouter>
       <div className="relative min-h-screen">

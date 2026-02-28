@@ -4,10 +4,8 @@ import { LayoutDashboard, MessageSquare, HelpCircle, Play, PlusCircle, Settings,
 
 const SIDEBAR_ITEMS = [
     { id: 'studio', label: 'Studio', icon: LayoutDashboard },
-    { id: 'chat', label: 'Chat AI', icon: MessageSquare },
+    { id: 'prompt', label: 'Prompt', icon: MessageSquare },
     { id: 'how', label: 'How It Works', icon: HelpCircle },
-    { id: 'demo', label: 'Demo', icon: Play },
-    { id: 'create', label: 'Create Room', icon: PlusCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
 ]
 

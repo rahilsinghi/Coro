@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Host from './Host.jsx'
 import Sidebar from '../components/Sidebar.jsx'
+import PromptPanel from '../components/PromptPanel.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoomStore } from '../store/roomStore'
 
@@ -17,32 +18,9 @@ export default function Studio() {
     const renderContent = () => {
         switch (activeItem) {
             case 'studio':
-            case 'create': // Create Room sidebar item also shows the main studio/host view for now
                 return <Host />
-
-            case 'chat':
-                return (
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-[60vh]">
-                        <div className="glass-card p-12 max-w-2xl w-full text-center space-y-6">
-                            <span className="text-5xl">💬</span>
-                            <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Studio Assistant</h2>
-                            <p className="text-white/40 font-medium leading-relaxed">
-                                Our Gemini-powered AI assistant is currently being tuned for your creative workflow.
-                                <br /><br />
-                                <span className="text-[#00D1FF] font-black tracking-widest uppercase text-xs">Coming Soon</span>
-                            </p>
-                            <div className="pt-8 flex justify-center">
-                                <div className="h-1 w-12 bg-[#00D1FF]/20 rounded-full overflow-hidden">
-                                    <motion.div
-                                        animate={{ x: [-48, 48] }}
-                                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                        className="h-full w-full bg-[#00D1FF] shadow-[0_0_10px_#00D1FF]"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
+            case 'prompt':
+                return <PromptPanel />
 
             case 'how':
                 return (
@@ -69,19 +47,7 @@ export default function Studio() {
                     </div>
                 )
 
-            case 'demo':
-                return (
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-[60vh]">
-                        <div className="glass-card p-12 max-w-2xl w-full text-center space-y-8">
-                            <span className="text-5xl">▶</span>
-                            <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Trial Mode</h2>
-                            <p className="text-white/40 font-medium">Explore the CORO synthesis engine in a solo sandbox environment.</p>
-                            <button className="btn-primary px-12 py-4 uppercase tracking-[0.2em] text-sm">
-                                Try Demo Soon
-                            </button>
-                        </div>
-                    </div>
-                )
+
 
             case 'settings':
                 return (

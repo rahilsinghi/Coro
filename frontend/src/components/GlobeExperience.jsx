@@ -22,14 +22,20 @@ export default function GlobeExperience() {
         <>
             {/* ── Layer 1: Ribbon Waves Background (fixed, z-0) ── */}
             <div
-                className="fixed inset-0 z-0 pointer-events-none transition-all ease-in-out"
+                className="fixed inset-0 z-0 pointer-events-none transition-all ease-in-out bg-black"
                 style={{
                     transitionDuration: '1200ms',
                     opacity: hasEnteredCoro ? 0.18 : 1,
                     transform: hasEnteredCoro ? 'scale(1.04)' : 'scale(1)',
                 }}
             >
-                <RibbonWavesBackground />
+                {/* Generated Landing Page Illustration */}
+                <img
+                    src="/coro_landing_hero_1772307686885.png"
+                    alt="Coro Landing Hero"
+                    className={`w-full h-full object-cover transition-all duration-1000 ${hasEnteredCoro ? 'blur-2xl opacity-40 scale-110' : 'opacity-100'}`}
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/40 via-transparent to-[#050814]" />
             </div>
 
             {/* ── Layer 2: Vignette (z-[5]) — only on landing ── */}

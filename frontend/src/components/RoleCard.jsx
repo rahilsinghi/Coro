@@ -7,7 +7,8 @@ export default function RoleCard({ role }) {
       {/* Decorative accent */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00D1FF]/40 to-transparent" />
 
-      <div className="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-700 drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+      {/* Role icon in corner */}
+      <div className="absolute top-6 right-6 text-2xl opacity-80 z-10 filter drop-shadow-[0_0_8px_rgba(0,209,255,0.4)]">
         {role.emoji}
       </div>
 

@@ -7,7 +7,7 @@ export const useRoomStore = create((set) => ({
   // Connection
   roomId: savedRoom?.roomId || null,
   roomName: savedRoom?.roomName || '',
-  userId: savedRoom?.userId || null,
+  userId: savedRoom?.userId || localStorage.getItem('cs_user_id') || null,
   role: savedRoom?.role || null,
   isHost: savedRoom?.isHost || false,
   isConnected: false,
@@ -83,6 +83,27 @@ export const useRoomStore = create((set) => ({
       bpm: 100,
       currentInputs: {},
       influenceWeights: {},
+      participants: [],
+      timeline: [],
+      applauseLevel: 0,
+      dropProgress: 0,
+    })
+  },
+  clearRoom: () => {
+    sessionStorage.removeItem('cs_room')
+    set({
+      roomId: null,
+      roomName: '',
+      role: null,
+      isHost: false,
+      isPlaying: false,
+      activePrompts: [],
+      bpm: 100,
+      density: 0.5,
+      brightness: 0.5,
+      currentInputs: {},
+      influenceWeights: {},
+      geminiReasoning: '',
       participants: [],
       timeline: [],
       applauseLevel: 0,

@@ -286,6 +286,25 @@ async def websocket_endpoint(websocket: WebSocket):
                         "needed": 3,
                     })
 
+            # ── LEAVE ROOM ──────────────────────────────────────────────────
+            elif msg_type == "leave_room":
+                if room_id and user_id:
+                    room_service.remove_user(room_id, user_id)
+                    # Broadcast updated participants
+                    if room_id in room_service.rooms:
+                        state_msg = room_service.get_state_update_message(room_id)
+                        await room_service.broadcast_json(room_id, state_msg)
+
+            # ── END STREAM ──────────────────────────────────────────────────
+            elif msg_type == "end_stream":
+                if room_id:
+                    room = room_service.rooms.get(room_id)
+                    if room and room.host_id == user_id:
+                        await room_service.broadcast_json(room_id, {"type": "room_ended"})
+                        await lyria_service.stop_session(room_id)
+                        room_service.destroy_room(room_id)
+
+
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected: user={user_id}, room={room_id}")
     except Exception as e:
