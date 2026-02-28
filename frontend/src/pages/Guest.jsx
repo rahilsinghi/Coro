@@ -10,6 +10,8 @@ import MoodInput from '../components/controls/MoodInput.jsx'
 import GenreGrid from '../components/controls/GenreGrid.jsx'
 import InstrumentGrid from '../components/controls/InstrumentGrid.jsx'
 import EnergyControl from '../components/controls/EnergyControl.jsx'
+import DropButton from '../components/DropButton.jsx'
+import BandStage from '../components/BandStage.jsx'
 import { ROLES, PROMPT_HINTS } from '../lib/constants.js'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
 import MiniPromptBar from '../components/MiniPromptBar.jsx'
@@ -197,13 +199,6 @@ export default function Guest() {
     }
   }, [])
 
-  const handleDrop = () => {
-    send({ type: 'drop', user_id: userId, room_id: roomId })
-    navigator.vibrate?.(100)
-    setShowShock(true)
-    setTimeout(() => setShowShock(false), 700)
-  }
-
   const toggleMic = async () => {
     if (micEnabled) {
       micStreamRef.current?.getTracks().forEach(t => t.stop())
@@ -226,7 +221,7 @@ export default function Guest() {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((a, b) => a + b, 0) / data.length / 255
         send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: avg })
-      }, 500)
+      }, 200)
       micStreamRef.current._interval = interval
     } catch (e) {
       console.warn('[Mic] Permission denied or unavailable:', e)
@@ -239,6 +234,12 @@ export default function Guest() {
       leaveRoom(userId, roomId)
       navigate('/studio')
     }
+  }
+
+  const handleDrop = () => {
+    send({ type: 'drop_vote', user_id: userId, room_id: roomId })
+    setShowShock(true)
+    setTimeout(() => setShowShock(false), 600)
   }
 
   const inRoom = !!(role && roomId)

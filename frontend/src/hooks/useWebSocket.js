@@ -87,18 +87,36 @@ class WebSocketManager {
       case 'music_stopped':
         this.store?.setPlaying(false)
         break
+      case 'stream_error':
+        console.error('[WS] Stream error:', msg.message)
+        this.store?.setPlaying(false)
+        break
+      case 'stream_recovered':
+        console.log('[WS] Stream recovered:', msg.message)
+        this.store?.setPlaying(true)
+        break
       case 'applause_level':
         this.store?.setApplauseLevel(msg.volume ?? 0)
+        break
+      case 'room_closed':
+        console.log('[WS] Room closed by host:', msg.message)
+        this.store?.reset()
         break
       case 'drop_progress':
         this.store?.setDropProgress(msg.count)
         break
+      case 'drop_incoming':
       case 'drop_triggered':
         this.store?.setDropProgress(0)
         // Trigger visual/haptic effects
         document.body.classList.add('drop-flash')
         navigator.vibrate?.([200, 100, 200])
         setTimeout(() => document.body.classList.remove('drop-flash'), 1000)
+        // Also forwarded to per-component listeners via onMessageCallbacks
+        break
+      case 'drop_reset':
+      case 'drop_already_voted':
+        // Forwarded to per-component listeners via onMessageCallbacks
         break
       case 'room_ended':
         this.store?.clearRoom()
@@ -140,9 +158,15 @@ export function useWebSocket() {
   const send = useCallback((message) => manager.send(message), [])
 
   const createRoom = useCallback((userId, deviceName = 'Unknown', { roomName = '', displayName = '' } = {}) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('Room creation timed out — check your connection'))
+      }, 10000)
+
       const cleanup = manager.addListener((msg) => {
         if (msg.type === 'room_created') {
+          clearTimeout(timeout)
           cleanup()
           store.setRoom(msg.room_id, userId, msg.role, true, msg.room_name || roomName)
           resolve(msg)
@@ -153,14 +177,21 @@ export function useWebSocket() {
   }, [send, store])
 
   const joinRoom = useCallback((roomId, userId, { displayName = '' } = {}) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('Join timed out — check your connection'))
+      }, 10000)
+
       const cleanup = manager.addListener((msg) => {
         if (msg.type === 'joined') {
+          clearTimeout(timeout)
           cleanup()
           store.setRoom(msg.room_id, msg.user_id, msg.role, false)
           resolve(msg)
         }
         if (msg.type === 'error') {
+          clearTimeout(timeout)
           cleanup()
           resolve({ error: msg.message })
         }
@@ -175,6 +206,10 @@ export function useWebSocket() {
 
   const stopMusic = useCallback((userId, roomId) => {
     send({ type: 'stop_music', user_id: userId, room_id: roomId })
+  }, [send])
+
+  const closeRoom = useCallback((userId, roomId) => {
+    send({ type: 'close_room', user_id: userId, room_id: roomId })
   }, [send])
 
   const sendInput = useCallback((userId, roomId, role, payload) => {
@@ -197,5 +232,7 @@ export function useWebSocket() {
     store.clearRoom()
   }, [send, store])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput, leaveRoom, endStream, addListener: (cb) => manager.addListener(cb) }
+  const addListener = useCallback((cb) => manager.addListener(cb), [])
+
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, addListener }
 }

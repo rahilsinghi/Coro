@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
+import BandStage from '../components/BandStage.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 import Timeline from '../components/Timeline.jsx'
 import SessionControls from '../components/SessionControls.jsx'
 import MiniPromptBar from '../components/MiniPromptBar.jsx'
 import PlayBar from '../components/PlayBar.jsx'
+import DropButton from '../components/DropButton.jsx'
 
 function formatInputSummary(inputs) {
   if (!inputs || typeof inputs !== 'object') return ''
@@ -23,9 +26,10 @@ function formatInputSummary(inputs) {
 
 export default function Host() {
   const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs } = useRoomStore()
-  const { startMusic, stopMusic, endStream } = useWebSocket()
+  const { startMusic, stopMusic, endStream, closeRoom } = useWebSocket()
   const clearRoom = useRoomStore((s) => s.clearRoom)
   const { unlock } = useAudioPlayer()
+  const navigate = useNavigate()
   const [showQR, setShowQR] = useState(true)
   const timelineEndRef = useRef(null)
 
@@ -107,8 +111,22 @@ export default function Host() {
           {/* ── MAIN GRID ── */}
           <div className="flex flex-col lg:flex-row gap-6 flex-1">
 
-            {/* LEFT — Visualizer (2/3 width) */}
+            {/* LEFT — Stage + Visualizer (2/3 width) */}
             <div className="flex-1 flex flex-col gap-6 lg:w-2/3">
+
+              {/* Band Stage — animated SVG characters */}
+              <BandStage participants={participants} isPlaying={isPlaying} currentInputs={currentInputs} />
+
+              {/* Session Timeline — horizontal scroll under stage */}
+              <div
+                className="rounded-[2rem] px-5 py-4"
+                style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-3 text-[#00D1FF]">
+                  Session Story
+                </p>
+                <Timeline events={timeline} />
+              </div>
 
               {/* Live Audio Visualizer card */}
               <div
@@ -242,6 +260,19 @@ export default function Host() {
                 </div>
               </div>
 
+              {/* Drop Button */}
+              {isPlaying && (
+                <div
+                  className="rounded-[2rem] p-6"
+                  style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(220,38,38,0.20)' }}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4 text-red-400">
+                    Crowd Drop
+                  </p>
+                  <DropButton userId={userId} roomId={roomId} />
+                </div>
+              )}
+
               {/* QR Code */}
               {showQR && (
                 <div
@@ -261,17 +292,6 @@ export default function Host() {
                   </button>
                 </div>
               )}
-
-              {/* Session Story — Timeline */}
-              <div
-                className="rounded-[2rem] p-6"
-                style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4 text-[#00D1FF]">
-                  Session Story
-                </p>
-                <Timeline events={timeline} />
-              </div>
 
               {/* Band Members — with display names + current inputs */}
               <div
@@ -306,6 +326,23 @@ export default function Host() {
                   </div>
                 )}
               </div>
+
+              {/* Leave Room */}
+              <button
+                onClick={() => {
+                  closeRoom(userId, roomId)
+                  clearRoom()
+                  navigate('/')
+                }}
+                className="w-full py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                style={{
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.20)',
+                  color: '#f87171',
+                }}
+              >
+                End Session
+              </button>
             </div>
           </div>
           <MiniPromptBar />

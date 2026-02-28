@@ -1,41 +1,53 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useRoomStore } from '../store/roomStore'
 import RibbonWavesBackground from './RibbonWavesBackground.jsx'
+import AuthModals from './AuthModals.jsx'
 
 // ─── GlobeExperience → Landing Hero ──────────────────────────────────────────
 export default function GlobeExperience() {
     const hasEnteredCoro = useRoomStore(s => s.hasEnteredCoro)
     const setEnteredCoro = useRoomStore(s => s.setEnteredCoro)
+    const isAuthed = useRoomStore(s => s.isAuthed)
     const navigate = useNavigate()
     const location = useLocation()
     const isLanding = location.pathname === '/'
     const showHero = !hasEnteredCoro && isLanding
+    const [showNameModal, setShowNameModal] = useState(false)
 
-    const handleEnter = () => {
+    const proceedToStudio = () => {
         setEnteredCoro(true)
         navigate('/studio')
+    }
+
+    const handleEnter = () => {
+        if (!isAuthed) {
+            setShowNameModal(true)
+            return
+        }
+        proceedToStudio()
+    }
+
+    const handleNameModalClose = () => {
+        setShowNameModal(false)
+        // After setting name, proceed to studio
+        const name = localStorage.getItem('cs_display_name')
+        if (name) proceedToStudio()
     }
 
     return (
         <>
             {/* ── Layer 1: Ribbon Waves Background (fixed, z-0) ── */}
             <div
-                className="fixed inset-0 z-0 pointer-events-none transition-all ease-in-out bg-black"
+                className="fixed inset-0 z-0 pointer-events-none transition-all ease-in-out"
                 style={{
                     transitionDuration: '1200ms',
                     opacity: hasEnteredCoro ? 0.18 : 1,
                     transform: hasEnteredCoro ? 'scale(1.04)' : 'scale(1)',
                 }}
             >
-                {/* Generated Landing Page Illustration */}
-                <img
-                    src="/coro_landing_hero_1772307686885.png"
-                    alt="Coro Landing Hero"
-                    className={`w-full h-full object-cover transition-all duration-1000 ${hasEnteredCoro ? 'blur-2xl opacity-40 scale-110' : 'opacity-100'}`}
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-[#050814]/40 via-transparent to-[#050814]" />
+                <RibbonWavesBackground />
             </div>
 
             {/* ── Layer 2: Vignette (z-[5]) — only on landing ── */}
@@ -181,6 +193,9 @@ export default function GlobeExperience() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Name entry modal — shown when user hasn't set a display name */}
+            <AuthModals isOpen={showNameModal} onClose={handleNameModalClose} />
         </>
     )
 }

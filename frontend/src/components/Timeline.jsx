@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 
 const EVENT_EMOJIS = {
     bpm: '🥁',
@@ -12,11 +12,32 @@ const EVENT_EMOJIS = {
     default: '🎵',
 }
 
-export default function Timeline({ events = [] }) {
-    const bottomRef = useRef(null)
+const SOURCE_COLORS = {
+    bpm: '#f59e0b',
+    mood: '#ec4899',
+    genre: '#06b6d4',
+    instrument: '#a855f7',
+    energy: '#22c55e',
+    drop: '#f87171',
+    applause: '#facc15',
+    prompt: '#00D1FF',
+    gemini: '#00D1FF',
+    default: 'rgba(255,255,255,0.4)',
+}
 
+export default function Timeline({ events = [] }) {
+    const scrollRef = useRef(null)
+    const [prevCount, setPrevCount] = useState(0)
+
+    // Auto-scroll to the bottom (newest) on new events
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        if (events.length > prevCount && scrollRef.current) {
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: 'smooth',
+            })
+        }
+        setPrevCount(events.length)
     }, [events.length])
 
     if (events.length === 0) {
@@ -24,7 +45,7 @@ export default function Timeline({ events = [] }) {
     }
 
     return (
-        <div className="max-h-64 overflow-y-auto space-y-4 pr-2 scrollbar-thin">
+        <div ref={scrollRef} className="max-h-64 overflow-y-auto space-y-4 pr-2 scrollbar-thin">
             {events.map((e, i) => {
                 const emoji = e.emoji || EVENT_EMOJIS[e.source?.toLowerCase()] || EVENT_EMOJIS.default
                 const timeStr = e.time ? new Date(e.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''
@@ -46,7 +67,6 @@ export default function Timeline({ events = [] }) {
                     </div>
                 )
             })}
-            <div ref={bottomRef} />
         </div>
     )
 }

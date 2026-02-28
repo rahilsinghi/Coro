@@ -29,8 +29,10 @@ class RoomService:
         self._host_devices: Dict[str, str] = {}
         # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
-        # room_id → list of drop press timestamps
-        self._drop_presses: Dict[str, list] = {}
+        # room_id → { user_id: timestamp } for the current drop vote window
+        self._drop_votes: Dict[str, Dict[str, float]] = {}
+        # room_id → timestamp when the current drop window started (None if no active window)
+        self._drop_window_start: Dict[str, Optional[float]] = {}
         # room_id → custom room name
         self._room_names: Dict[str, str] = {}
         # room_id → user_id → display name
@@ -152,20 +154,85 @@ class RoomService:
         self._timeline.pop(room_id, None)
         print(f"[Room] Destroyed room {room_id}")
 
-    def record_drop(self, room_id: str) -> bool:
-        """Record a drop press. Returns True if 3+ drops within 2 seconds."""
+    def get_drop_threshold(self, room_id: str) -> int:
+        """Required votes = ceil(participants / 2), minimum 1."""
+        import math
+        total = len(self.user_roles.get(room_id, {}))
+        return max(1, math.ceil(total / 2))
+
+    def destroy_room(self, room_id: str):
+        """Fully destroy a room — stop tick loop, purge all state."""
+        self.stop_tick_loop(room_id)
+        self.rooms.pop(room_id, None)
+        self.connections.pop(room_id, None)
+        self.user_sockets.pop(room_id, None)
+        self.user_roles.pop(room_id, None)
+        self._host_devices.pop(room_id, None)
+        self._room_names.pop(room_id, None)
+        self.user_display_names.pop(room_id, None)
+        self._timeline.pop(room_id, None)
+        self._drop_votes.pop(room_id, None)
+        self._drop_window_start.pop(room_id, None)
+        print(f"[Room] Destroyed room {room_id}")
+
+    def record_drop(self, room_id: str, connection_id: str, user_id: str = None) -> str:
+        """
+        Record a drop vote, keyed by connection_id (one unique vote per WebSocket
+        connection, not per user_id, to avoid collisions when multiple tabs share
+        the same localStorage user_id during testing).
+
+        Returns:
+          "triggered"    — 3 unique connections voted in time; drop fires
+          "registered"   — vote counted; not enough yet
+          "already_voted"— this connection already voted in the active window
+        """
         now = time.time()
-        presses = self._drop_presses.setdefault(room_id, [])
-        presses.append(now)
-        # Remove presses older than 2 seconds
-        self._drop_presses[room_id] = [t for t in presses if now - t <= 2.0]
-        count = len(self._drop_presses[room_id])
-        print(f"[Room] DROP press for {room_id}: {count}/3 in window")
-        if count >= 3:
-            self._drop_presses[room_id] = []  # Reset after triggering
+        votes = self._drop_votes.setdefault(room_id, {})
+        window_start = self._drop_window_start.get(room_id)
+
+        # Stale window safety net
+        if window_start and now - window_start > 5.5:
+            votes.clear()
+            self._drop_window_start[room_id] = None
+            window_start = None
+
+        # One vote per connection
+        if connection_id in votes:
+            return "already_voted"
+
+        # Start window on first vote
+        if not votes:
+            self._drop_window_start[room_id] = now
+
+        votes[connection_id] = now
+        count = len(votes)
+        needed = self.get_drop_threshold(room_id)
+
+        # Resolve display name for timeline
+        display = None
+        if user_id:
+            display = self.user_display_names.get(room_id, {}).get(user_id)
+        display = display or (user_id[:8] if user_id else "anon")
+
+        self.log_event(room_id, "drop", f"{display} voted drop ({count}/{needed})")
+        print(f"[Room] DROP vote from {display} (conn={connection_id[:8]}) for {room_id}: {count}/{needed}")
+
+        if count >= needed:
+            votes.clear()
+            self._drop_window_start[room_id] = None
+            self.log_event(room_id, "drop", "🔥 DROP TRIGGERED!")
             print(f"[Room] 🔥 DROP TRIGGERED for {room_id}!")
-            return True
-        return False
+            return "triggered"
+
+        return "registered"
+
+    def reset_drop_votes(self, room_id: str):
+        """Reset drop votes after window expiry."""
+        self._drop_votes.setdefault(room_id, {}).clear()
+        self._drop_window_start[room_id] = None
+
+    def get_drop_vote_count(self, room_id: str) -> int:
+        return len(self._drop_votes.get(room_id, {}))
 
     def log_event(self, room_id: str, event_type: str, description: str):
         """Append a timestamped event to the room's timeline (capped at 50)."""
@@ -225,6 +292,7 @@ class RoomService:
         return {
             "type": "state_update",
             "room_name": self._room_names.get(room_id, ""),
+            "is_playing": room.is_playing,
             "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
@@ -271,6 +339,7 @@ class RoomService:
 
     async def _tick_loop(self, room_id: str, callback):
         """Fires callback every 4 seconds with current room state."""
+        consecutive_errors = 0
         while True:
             await asyncio.sleep(4)
             if room_id not in self.rooms:
@@ -287,7 +356,19 @@ class RoomService:
                 room.brightness = float(energy_input["brightness"])
 
             print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
-            await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            try:
+                await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+                consecutive_errors = 0
+            except Exception as e:
+                consecutive_errors += 1
+                print(f"[Room] Tick callback error #{consecutive_errors} for room {room_id}: {e}")
+                if consecutive_errors >= 3:
+                    print(f"[Room] Too many consecutive errors — notifying room {room_id}")
+                    await self.broadcast_json(room_id, {
+                        "type": "stream_error",
+                        "message": "Music stream interrupted. Try restarting.",
+                    })
+                    consecutive_errors = 0
             # Clear consumed inputs so stale ones don't re-trigger Gemini
             room.current_inputs = {}
 

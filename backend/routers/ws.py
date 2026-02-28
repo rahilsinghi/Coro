@@ -5,6 +5,7 @@ Wires Lyria audio broadcast → room broadcast.
 Wires Gemini tick → Lyria prompt update → state broadcast.
 """
 import json
+import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from google.genai import types as genai_types
 
@@ -43,18 +44,21 @@ async def _arbitration_tick(room_id: str, current_inputs, current_bpm, current_d
         current_brightness=current_brightness,
     )
 
-    # 2. Update Lyria prompts
-    lyria_prompts = [
-        genai_types.WeightedPrompt(text=p.text, weight=p.weight)
-        for p in result.prompts
-    ]
-    await lyria_service.update_prompts(
-        room_id=room_id,
-        prompts=lyria_prompts,
-        bpm=result.bpm,
-        density=result.density,
-        brightness=result.brightness,
-    )
+    # 2. Update Lyria prompts (non-fatal — audio may continue with old prompts)
+    try:
+        lyria_prompts = [
+            genai_types.WeightedPrompt(text=p.text, weight=p.weight)
+            for p in result.prompts
+        ]
+        await lyria_service.update_prompts(
+            room_id=room_id,
+            prompts=lyria_prompts,
+            bpm=result.bpm,
+            density=result.density,
+            brightness=result.brightness,
+        )
+    except Exception as e:
+        print(f"[WS] Lyria prompt update failed (non-fatal): {e}")
 
     # 3. Update room state
     room_service.update_after_arbitration(
@@ -79,6 +83,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
     room_id = None
     user_id = None
+    # Unique per-connection ID for drop vote deduplication (one vote per physical
+    # browser tab/device regardless of shared localStorage user_id)
+    connection_id = str(uuid.uuid4())
 
     # WS heartbeat to keep Railway connection alive
     import asyncio
@@ -213,6 +220,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     await lyria_service.stop_session(room_id)
                     await room_service.broadcast_json(room_id, {"type": "music_stopped"})
 
+            # ── CLOSE ROOM (host leaves) ─────────────────────────────────────
+            elif msg_type == "close_room":
+                if not room_id:
+                    continue
+                room = room_service.rooms.get(room_id)
+                if not room or room.host_id != user_id:
+                    await websocket.send_json({"type": "error", "message": "Only host can close the room"})
+                    continue
+                # Stop music if playing
+                if room.is_playing:
+                    room.is_playing = False
+                    room_service.stop_tick_loop(room_id)
+                    await lyria_service.stop_session(room_id)
+                # Notify all clients the room is closing
+                await room_service.broadcast_json(room_id, {
+                    "type": "room_closed",
+                    "message": "Host ended the session",
+                })
+                # Destroy all room state
+                room_service.destroy_room(room_id)
+                print(f"[WS] Room {room_id} closed by host {user_id}")
+                room_id = None
+
             # ── INPUT UPDATE ─────────────────────────────────────────────────
             elif msg_type == "input_update":
                 if not room_id:
@@ -231,28 +261,88 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "applause_update":
                 if not room_id:
                     continue
-                volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
+                raw_volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
                 room = room_service.rooms.get(room_id)
                 if room:
-                    # Smooth blend: 30% mic input, 70% existing state
-                    blended_density = round(room.density * 0.7 + volume * 0.3, 2)
+                    # sqrt curve: amplifies soft sounds so even quiet claps are noticeable
+                    # e.g. 0.1 raw → 0.32 scaled, 0.5 raw → 0.71 scaled, 1.0 → 1.0
+                    import math
+                    scaled = round(math.sqrt(raw_volume), 3)
+
+                    # Loud applause (scaled >= 0.7) doubles current density, capped at 1.0
+                    # Soft claps still push density meaningfully via 60% mic weight
+                    if scaled >= 0.7:
+                        new_density = round(min(room.density * 2.0, 1.0), 2)
+                        new_brightness = round(min(room.brightness * 1.5, 1.0), 2)
+                    else:
+                        new_density = round(min(room.density * 0.4 + scaled * 0.6, 1.0), 2)
+                        new_brightness = room.brightness
+
+                    # Write back so the next Gemini tick sees the updated state
+                    room.density = new_density
+                    room.brightness = new_brightness
                     room.current_inputs["crowd_energy"] = {
-                        "applause_volume": round(volume, 2),
-                        "blended_density": blended_density,
+                        "applause_volume": round(raw_volume, 2),
+                        "scaled_volume": scaled,
+                        "density": new_density,
+                        "brightness": new_brightness,
                     }
-                    print(f"[WS] Applause update room={room_id} volume={volume:.2f} blended_density={blended_density:.2f}")
+
+                    # Push the change to Lyria immediately (don't wait 4 s for the tick)
+                    if room.is_playing:
+                        session_data = lyria_service._sessions.get(room_id)
+                        if session_data:
+                            current_prompts = session_data.get("last_prompts")
+                            if current_prompts:
+                                await lyria_service.update_prompts(
+                                    room_id=room_id,
+                                    prompts=current_prompts,
+                                    bpm=session_data.get("bpm", room.bpm),
+                                    density=new_density,
+                                    brightness=new_brightness,
+                                )
+
+                    print(
+                        f"[WS] Applause room={room_id} raw={raw_volume:.2f} "
+                        f"scaled={scaled:.2f} density={new_density:.2f} brightness={new_brightness:.2f}"
+                    )
                     await room_service.broadcast_json(room_id, {
                         "type": "applause_level",
-                        "volume": round(volume, 2),
+                        "volume": round(raw_volume, 2),
+                        "scaled_volume": scaled,
+                        "density": new_density,
+                        "loud": scaled >= 0.7,
                     })
 
             # ── DROP ────────────────────────────────────────────────────────
             elif msg_type == "drop":
                 if not room_id:
                     continue
-                triggered = room_service.record_drop(room_id)
-                if triggered:
-                    # Override Gemini — force a drop prompt directly to Lyria
+                result = room_service.record_drop(room_id, connection_id, user_id)
+                needed = room_service.get_drop_threshold(room_id)
+
+                if result == "already_voted":
+                    await websocket.send_json({
+                        "type": "drop_already_voted",
+                        "count": room_service.get_drop_vote_count(room_id),
+                        "needed": needed,
+                    })
+
+                elif result == "triggered":
+                    # Frontend reads in_seconds from this message — not hardcoded there.
+                    DROP_DELAY = 3
+                    # Always broadcast drop_incoming unconditionally so all clients
+                    # see the countdown even if room lookup fails for Lyria step.
+                    await room_service.broadcast_json(room_id, {
+                        "type": "drop_incoming",
+                        "in_seconds": DROP_DELAY,
+                        "count": needed,
+                        "needed": needed,
+                    })
+                    # Schedule Lyria update + drop_triggered after countdown.
+                    # drop_triggered is ALWAYS sent after the delay regardless of
+                    # whether the Lyria call succeeds (separate try/except).
+                    room = room_service.rooms.get(room_id)
                     from google.genai import types as drop_types
                     drop_prompts = [
                         drop_types.WeightedPrompt(
@@ -264,27 +354,46 @@ async def websocket_endpoint(websocket: WebSocket):
                             weight=0.3
                         ),
                     ]
-                    room = room_service.rooms.get(room_id)
-                    if room:
-                        await lyria_service.update_prompts(
-                            room_id=room_id,
-                            prompts=drop_prompts,
-                            bpm=min(room.bpm + 20, 160),
-                            density=1.0,
-                            brightness=0.3,
-                        )
-                        await room_service.broadcast_json(room_id, {
+                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts, delay=DROP_DELAY):
+                        await asyncio.sleep(delay)
+                        if r:
+                            try:
+                                await lyria_service.update_prompts(
+                                    room_id=rid,
+                                    prompts=dp,
+                                    bpm=min(r.bpm + 20, 160),
+                                    density=1.0,
+                                    brightness=0.3,
+                                )
+                            except Exception as e:
+                                print(f"[WS] Drop Lyria update failed (non-fatal): {e}")
+                        # Always broadcast drop_triggered so UI resets
+                        await room_service.broadcast_json(rid, {
                             "type": "drop_triggered",
                             "message": "🔥 DROP!"
                         })
-                else:
-                    # Broadcast drop count so UI can show building pressure
-                    count = len(room_service._drop_presses.get(room_id, []))
+                    asyncio.create_task(_fire_drop())
+
+                elif result == "registered":
+                    count = room_service.get_drop_vote_count(room_id)
                     await room_service.broadcast_json(room_id, {
                         "type": "drop_progress",
                         "count": count,
-                        "needed": 3,
+                        "needed": needed,
                     })
+                    # On first vote, start 10-second expiry window
+                    if count == 1:
+                        async def _expire_drop(rid=room_id):
+                            await asyncio.sleep(10.0)
+                            if room_service.get_drop_vote_count(rid) > 0:
+                                room_service.reset_drop_votes(rid)
+                                n = room_service.get_drop_threshold(rid)
+                                await room_service.broadcast_json(rid, {
+                                    "type": "drop_reset",
+                                    "needed": n,
+                                    "message": "Not enough votes — try again",
+                                })
+                        asyncio.create_task(_expire_drop())
 
             # ── LEAVE ROOM ──────────────────────────────────────────────────
             elif msg_type == "leave_room":
