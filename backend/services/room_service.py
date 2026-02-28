@@ -125,6 +125,20 @@ class RoomService:
         print(f"[Room] Assigned {assigned_role.value} to {name_label} in room {room_id}")
         return assigned_role
 
+    def change_user_role(self, room_id: str, user_id: str, new_role: Role) -> Optional[str]:
+        """Change a user's role. Returns old role value on success, None on failure."""
+        if room_id not in self.rooms:
+            return None
+        room_roles = self.user_roles.get(room_id, {})
+        if user_id not in room_roles:
+            return None
+        old_role = room_roles[user_id]
+        room_roles[user_id] = new_role
+        display_name = self.user_display_names.get(room_id, {}).get(user_id, user_id[:8])
+        self.log_event(room_id, "role_change", f"{display_name} switched from {old_role.value} to {new_role.value}")
+        print(f"[Room] {display_name} switched from {old_role.value} to {new_role.value} in room {room_id}")
+        return old_role.value
+
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
         """Remove explicit socket connection, but persist the role for transient disconnects."""
         if room_id in self.connections:

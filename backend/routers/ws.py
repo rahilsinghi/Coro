@@ -482,6 +482,27 @@ async def websocket_endpoint(websocket: WebSocket):
                                 })
                         asyncio.create_task(_expire_drop())
 
+            # ── CHANGE ROLE ────────────────────────────────────────────────
+            elif msg_type == "change_role":
+                if room_id and user_id:
+                    role_str = msg.get("role")
+                    if role_str:
+                        from models.schemas import Role as RoleEnum
+                        try:
+                            new_role = RoleEnum(role_str)
+                            old_role_val = room_service.change_user_role(room_id, user_id, new_role)
+                            if old_role_val:
+                                await websocket.send_json({
+                                    "type": "role_changed",
+                                    "role": new_role.value,
+                                    "old_role": old_role_val,
+                                })
+                                if room_id in room_service.rooms:
+                                    state_msg = room_service.get_state_update_message(room_id)
+                                    await room_service.broadcast_json(room_id, state_msg)
+                        except ValueError:
+                            await websocket.send_json({"type": "error", "message": f"Unknown role: {role_str}"})
+
             # ── UPDATE DISPLAY NAME ────────────────────────────────────────
             elif msg_type == "update_display_name":
                 if room_id and user_id:
