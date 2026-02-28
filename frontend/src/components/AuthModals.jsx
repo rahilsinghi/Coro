@@ -61,29 +61,38 @@ export default function AuthModals({ isOpen, type, onClose }) {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="bg-[#000c1e] border border-[#00D1FF]/25 rounded-[2rem] p-10 shadow-[0_0_120px_rgba(0,0,0,0.9),0_0_40px_rgba(0,209,255,0.08)]">
-                            {/* Close Button */}
-                            <button
-                                onClick={onClose}
-                                className="absolute top-7 right-8 text-white/30 hover:text-white transition-colors"
-                                aria-label="Close modal"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                            {/* 3-column header: spacer | centered label | close button */}
+                            <div className="flex items-start justify-between mb-8">
+                                {/* Left spacer — same width as X button */}
+                                <div className="w-8 shrink-0" />
 
-                            {/* Header */}
-                            <div className="mb-8">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-px bg-[#00D1FF]/40" />
-                                    <span className="text-[#00D1FF]/60 text-[10px] uppercase tracking-[0.4em] font-black">CORO Studio</span>
+                                {/* Centered label block */}
+                                <div className="flex-1 flex flex-col items-center text-center gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-6 h-px bg-[#00D1FF]/35" />
+                                        <span className="text-[#00D1FF]/65 text-[10px] uppercase tracking-[0.45em] font-black whitespace-nowrap">
+                                            CORO Studio
+                                        </span>
+                                        <div className="w-6 h-px bg-[#00D1FF]/35" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-white tracking-tighter">
+                                        {type === 'login' ? 'Welcome Back' : 'Join CORO'}
+                                    </h2>
+                                    <p className="text-white/40 text-sm font-medium">
+                                        {type === 'login' ? 'Sign in to your studio account.' : 'Create your studio account.'}
+                                    </p>
                                 </div>
-                                <h2 className="text-3xl font-black text-white tracking-tighter">
-                                    {type === 'login' ? 'Welcome Back' : 'Join CORO'}
-                                </h2>
-                                <p className="text-white/40 text-sm mt-2 font-medium">
-                                    {type === 'login' ? 'Sign in to your studio account.' : 'Create your studio account.'}
-                                </p>
+
+                                {/* Close button — right side */}
+                                <button
+                                    onClick={onClose}
+                                    className="w-8 shrink-0 flex items-start justify-end text-white/30 hover:text-white transition-colors pt-0.5"
+                                    aria-label="Close modal"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-5">

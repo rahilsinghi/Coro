@@ -35,7 +35,7 @@ export default function Guest() {
   const roleInfo = ROLES[role]
 
   return (
-    <div className="min-h-screen flex flex-col px-6 py-8 max-w-md mx-auto pt-24 pb-12 transition-all duration-1000">
+    <div className="min-h-screen flex flex-col px-6 py-8 max-w-md mx-auto pt-24 pb-12 pointer-events-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

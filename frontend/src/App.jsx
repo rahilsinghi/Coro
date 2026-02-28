@@ -15,7 +15,7 @@ export default function App() {
       <div className="relative min-h-screen">
         <Navbar />
         <GlobeExperience analyser={getAnalyser()} />
-        <main className="relative z-10 overflow-x-hidden pt-20">
+        <main className="relative z-10 overflow-x-hidden pt-20 pointer-events-none">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/host" element={<Host />} />
