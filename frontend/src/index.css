@@ -4,33 +4,81 @@
 
 @layer base {
   body {
-    @apply bg-cs-bg text-cs-text font-sans;
+    background-color: #000000;
+    color: #ffffff;
+    font-family: Inter, system-ui, sans-serif;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
-  }
-
-  * {
-    box-sizing: border-box;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-cs-accent hover:bg-blue-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 active:scale-95;
+    background-color: #00D1FF;
+    color: #000;
+    font-weight: 900;
+    padding: 1rem 2rem;
+    border-radius: 9999px;
+    transition: all 0.3s;
+    box-shadow: 0 0 20px rgba(0, 209, 255, 0.3);
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary:hover {
+    background-color: #00E5FF;
+    box-shadow: 0 0 40px rgba(0, 209, 255, 0.6);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.95);
   }
 
   .btn-secondary {
-    @apply bg-cs-surface border border-cs-border hover:border-cs-accent text-cs-text font-medium px-5 py-2.5 rounded-xl transition-all duration-200;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-weight: 900;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    transition: all 0.3s;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
   }
 
-  .card {
-    @apply bg-cs-surface border border-cs-border rounded-2xl p-5;
+  .btn-secondary:hover {
+    border-color: rgba(0, 209, 255, 0.4);
   }
 
-  .tile {
-    @apply bg-cs-bg border border-cs-border rounded-xl px-4 py-3 text-sm font-medium cursor-pointer transition-all duration-150 hover:border-cs-accent hover:text-cs-accent select-none;
+  .btn-secondary:active {
+    transform: scale(0.95);
   }
 
-  .tile-active {
-    @apply border-cs-accent text-cs-accent bg-blue-900/20;
+  .glass-card {
+    background-color: rgba(0, 8, 22, 0.4);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 2.5rem;
+    box-shadow: 0 30px 100px rgba(0, 0, 0, 0.4);
+  }
+
+  .neon-input {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 1rem 1.5rem;
+    color: #fff;
+    outline: none;
+    transition: all 0.2s;
+    width: 100%;
+  }
+
+  .neon-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+  }
+
+  .neon-input:focus {
+    border-color: #00D1FF;
+    box-shadow: 0 0 15px rgba(0, 209, 255, 0.2);
   }
 }

@@ -28,90 +28,110 @@ export default function Host() {
   if (!roomId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-cs-muted">No room found. <a href="/" className="text-cs-accent underline">Go back</a></p>
+        <p className="text-white/40 font-black tracking-widest uppercase text-sm">No room found. <a href="/" className="text-[#00D1FF] underline ml-2">Re-initialize</a></p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col p-6 max-w-5xl mx-auto">
+    <div className="min-h-screen flex flex-col p-6 max-w-6xl mx-auto pt-24 pb-12 transition-all duration-1000">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            CORO
-          </h1>
-          <p className="text-cs-muted text-sm mt-0.5">
-            Room <span className="font-mono text-white">{roomId}</span>
-            {isPlaying && <span className="ml-2 text-green-400 animate-pulse">● LIVE</span>}
-          </p>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-6">
+          <div className="w-12 h-12 rounded-2xl bg-[#00D1FF]/10 flex items-center justify-center border border-[#00D1FF]/20 shadow-[0_0_20px_rgba(0,209,255,0.1)]">
+            <span className="text-[#00D1FF] text-xl">🎙️</span>
+          </div>
+          <div>
+            <h1 className="text-sm font-black text-white/40 uppercase tracking-[0.4em]">
+              CORO <span className="text-[#00D1FF]/80">Studio Root</span>
+            </h1>
+            <p className="flex items-center gap-2 text-xl font-bold mt-1 text-white">
+              Room <span className="text-[#00D1FF] font-mono tracking-widest uppercase">{roomId}</span>
+              {isPlaying && <span className="ml-2 text-green-400 text-[10px] animate-pulse">● LIVE AUDIO</span>}
+            </p>
+          </div>
         </div>
         <button
           onClick={() => setShowQR((v) => !v)}
-          className="btn-secondary text-sm"
+          className="btn-secondary text-xs uppercase tracking-widest py-3 px-8"
         >
-          {showQR ? 'Hide QR' : 'Show QR'}
+          {showQR ? 'Hide Session QR' : 'Show Session QR'}
         </button>
       </div>
 
-      <div className="flex gap-6 flex-1">
+      <div className="flex flex-col lg:flex-row gap-8 flex-1">
         {/* Left panel */}
-        <div className="flex-1 flex flex-col gap-5">
+        <div className="flex-1 flex flex-col gap-8">
           {/* Visualizer */}
-          <div className="card flex-1 min-h-48">
+          <div className="glass-card flex-1 min-h-[300px] overflow-hidden relative group">
             <AudioVisualizer isPlaying={isPlaying} />
+            {!isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
+                <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] font-black">Waiting for stream start...</p>
+              </div>
+            )}
           </div>
 
           {/* Active prompts */}
-          <div className="card">
-            <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
-              🤖 Gemini is playing
+          <div className="glass-card p-8">
+            <p className="text-[10px] text-[#00D1FF]/60 font-black uppercase tracking-[0.3em] mb-4">
+              AI Orchestration Status
             </p>
             <ActivePrompts prompts={activePrompts} />
             {geminiReasoning && (
-              <p className="text-cs-muted text-xs mt-3 italic">"{geminiReasoning}"</p>
+              <p className="text-white/40 text-xs mt-6 italic bg-white/5 p-4 rounded-2xl">"{geminiReasoning}"</p>
             )}
-            <div className="flex gap-4 mt-3 text-sm text-cs-muted">
-              <span>BPM: <span className="text-white font-mono">{bpm}</span></span>
+            <div className="flex gap-8 mt-6 text-[10px] font-black uppercase tracking-widest text-white/30">
+              <span>BPM: <span className="text-white">{bpm}</span></span>
+              <span>Network: <span className="text-green-400">Stable</span></span>
             </div>
           </div>
         </div>
 
         {/* Right panel */}
-        <div className="w-64 flex flex-col gap-5">
+        <div className="w-full lg:w-80 flex flex-col gap-8">
           {/* QR Code */}
           {showQR && (
-            <div className="card flex flex-col items-center gap-3">
-              <p className="text-sm font-medium text-cs-muted">Scan to join</p>
-              <QRCodeSVG
-                value={joinUrl}
-                size={160}
-                bgColor="#12121a"
-                fgColor="#e2e8f0"
-                includeMargin
-              />
-              <p className="font-mono text-xl font-bold text-cs-accent tracking-widest">{roomId}</p>
-              <p className="text-xs text-cs-muted break-all text-center">{joinUrl}</p>
+            <div className="glass-card p-8 flex flex-col items-center gap-4 group">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Broadcasting Join URL</p>
+              <div className="p-4 bg-white rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-transform duration-500">
+                <QRCodeSVG
+                  value={joinUrl}
+                  size={160}
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                  includeMargin={false}
+                />
+              </div>
+              <p className="font-mono text-2xl font-black text-[#00D1FF] tracking-[0.3em] uppercase">{roomId}</p>
+              <button
+                onClick={() => navigator.clipboard.writeText(joinUrl)}
+                className="text-[10px] text-white/30 hover:text-white transition-colors underline break-all text-center uppercase font-bold"
+              >
+                Copy Session Link
+              </button>
             </div>
           )}
 
           {/* Influence meter */}
-          <div className="card flex-1">
-            <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
-              Crowd Influence
+          <div className="glass-card p-8 flex-1 flex flex-col">
+            <p className="text-[10px] text-[#00D1FF]/60 font-black uppercase tracking-[0.3em] mb-6">
+              Audience Influence
             </p>
-            <InfluenceMeter weights={influenceWeights} />
+            <div className="flex-1">
+              <InfluenceMeter weights={influenceWeights} />
+            </div>
           </div>
 
           {/* Play / Stop */}
           <button
             onClick={isPlaying ? handleStop : handlePlay}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${isPlaying
-              ? 'bg-red-600 hover:bg-red-500 text-white'
-              : 'bg-cs-accent hover:bg-blue-400 text-white shadow-[0_0_15px_rgba(0,195,255,0.4)]'
+            className={`w-full py-6 rounded-[2rem] font-black text-lg transition-all shadow-[0_20px_50px_rgba(0,0,0,0.5)] active:scale-95 ${isPlaying
+              ? 'bg-red-500/80 hover:bg-red-500 text-white shadow-red-500/20'
+              : 'bg-[#00D1FF] hover:bg-[#00E5FF] text-black shadow-[#00D1FF]/20'
               }`}
           >
-            {isPlaying ? '⏹ Stop Music' : '▶ Start Music'}
+            {isPlaying ? '⏹ TERMINATE MUSIC' : '▶ START STUDIO STREAM'}
           </button>
         </div>
       </div>

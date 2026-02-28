@@ -8,7 +8,13 @@ export const useRoomStore = create((set) => ({
   isHost: false,
   isConnected: false,
   isPlaying: false,
+  isAuthed: sessionStorage.getItem('isAuthed') === 'true',
   hasEnteredCoro: sessionStorage.getItem('hasEnteredCoro') === 'true',
+
+  setAuthed: (val) => {
+    sessionStorage.setItem('isAuthed', val)
+    set({ isAuthed: val })
+  },
 
   // Music state (from server state_update)
   activePrompts: [],
