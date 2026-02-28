@@ -4,11 +4,12 @@ import { useRoomStore } from '../store/roomStore'
 
 export default function SessionControls() {
     const [joinCode, setJoinCode] = useState('')
+    const [sessionName, setSessionName] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
     const { createRoom, joinRoom } = useWebSocket()
-    const { isConnected, userId } = useRoomStore()
+    const { isConnected, userId, displayName } = useRoomStore()
 
     const getDeviceName = () => {
         const ua = navigator.userAgent
@@ -24,7 +25,7 @@ export default function SessionControls() {
         setLoading(true)
         setError('')
         try {
-            await createRoom(userId, getDeviceName())
+            await createRoom(userId, getDeviceName(), { roomName: sessionName.trim(), displayName })
         } catch (e) {
             setError('Failed to create room.')
         } finally {
@@ -37,7 +38,7 @@ export default function SessionControls() {
         setLoading(true)
         setError('')
         try {
-            const result = await joinRoom(joinCode.trim().toUpperCase(), userId)
+            const result = await joinRoom(joinCode.trim().toUpperCase(), userId, { displayName })
             if (result.error) setError(result.error)
         } catch (e) {
             setError('Failed to join room.')
@@ -60,6 +61,14 @@ export default function SessionControls() {
                 {/* Host Section */}
                 <div className="flex-1 space-y-3">
                     <p className="text-[10px] font-black text-[#00D1FF]/60 uppercase tracking-[0.4em]">Initialize Session</p>
+                    <input
+                        type="text"
+                        value={sessionName}
+                        onChange={(e) => setSessionName(e.target.value)}
+                        placeholder="Session name (optional)"
+                        maxLength={40}
+                        className="neon-input w-full py-3 text-center text-sm"
+                    />
                     <button
                         onClick={handleCreate}
                         disabled={!isConnected || loading}

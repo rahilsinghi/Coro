@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoomStore } from '../store/roomStore'
 
-export default function AuthModals({ isOpen, type, onClose }) {
+export default function AuthModals({ isOpen, onClose }) {
     const { setAuthed } = useRoomStore()
-    const [loading, setLoading] = useState(false)
+    const [name, setName] = useState('')
 
     // Escape closes modal + scroll lock
     useEffect(() => {
@@ -25,12 +25,9 @@ export default function AuthModals({ isOpen, type, onClose }) {
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        setLoading(true)
-        setTimeout(() => {
-            setAuthed(true)
-            setLoading(false)
-            onClose()
-        }, 1000)
+        if (!name.trim()) return
+        setAuthed(true, name.trim())
+        onClose()
     }
 
     // Render via portal to document.body to escape any overflow/z-index parent context
@@ -76,10 +73,10 @@ export default function AuthModals({ isOpen, type, onClose }) {
                                         <div className="w-6 h-px bg-[#00D1FF]/35" />
                                     </div>
                                     <h2 className="text-2xl font-black text-white tracking-tighter">
-                                        {type === 'login' ? 'Welcome Back' : 'Join CORO'}
+                                        What's your name?
                                     </h2>
                                     <p className="text-white/40 text-sm font-medium">
-                                        {type === 'login' ? 'Sign in to your studio account.' : 'Create your studio account.'}
+                                        This is how other players will see you.
                                     </p>
                                 </div>
 
@@ -98,28 +95,18 @@ export default function AuthModals({ isOpen, type, onClose }) {
                             <form onSubmit={handleSubmit} className="space-y-5">
                                 <div>
                                     <label className="block text-[10px] uppercase tracking-[0.3em] text-[#00D1FF]/50 font-black mb-2">
-                                        Email
+                                        Display Name
                                     </label>
                                     <input
                                         autoFocus
                                         required
-                                        type="email"
-                                        placeholder="name@example.com"
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder="e.g. DJ Nova"
+                                        maxLength={24}
                                         className="w-full bg-white/[0.04] border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-white/20 outline-none transition-all"
                                         style={{ '--tw-ring-color': '#00D1FF' }}
-                                        onFocus={e => e.target.style.borderColor = '#00D1FF'}
-                                        onBlur={e => e.target.style.borderColor = ''}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] uppercase tracking-[0.3em] text-[#00D1FF]/50 font-black mb-2">
-                                        Password
-                                    </label>
-                                    <input
-                                        required
-                                        type="password"
-                                        placeholder="••••••••"
-                                        className="w-full bg-white/[0.04] border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-white/20 outline-none transition-all"
                                         onFocus={e => e.target.style.borderColor = '#00D1FF'}
                                         onBlur={e => e.target.style.borderColor = ''}
                                     />
@@ -127,7 +114,7 @@ export default function AuthModals({ isOpen, type, onClose }) {
 
                                 <button
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={!name.trim()}
                                     className="w-full text-black font-black py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 mt-2"
                                     style={{
                                         background: '#00D1FF',
@@ -136,7 +123,7 @@ export default function AuthModals({ isOpen, type, onClose }) {
                                     onMouseEnter={e => e.target.style.background = '#00E5FF'}
                                     onMouseLeave={e => e.target.style.background = '#00D1FF'}
                                 >
-                                    {loading ? 'Authenticating...' : (type === 'login' ? 'Log In' : 'Create Account')}
+                                    Enter Studio
                                 </button>
                             </form>
                         </div>

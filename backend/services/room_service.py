@@ -31,8 +31,14 @@ class RoomService:
         self._tick_tasks: Dict[str, asyncio.Task] = {}
         # room_id → list of drop press timestamps
         self._drop_presses: Dict[str, list] = {}
+        # room_id → custom room name
+        self._room_names: Dict[str, str] = {}
+        # room_id → user_id → display name
+        self.user_display_names: Dict[str, Dict[str, str]] = {}
+        # room_id → list of timeline events (capped at 50)
+        self._timeline: Dict[str, list] = {}
 
-    def create_room(self, host_id: str, device_name: str = "Unknown") -> RoomState:
+    def create_room(self, host_id: str, device_name: str = "Unknown", room_name: str = "") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
         room = RoomState(
             room_id=room_id,
@@ -49,8 +55,14 @@ class RoomService:
         self.user_sockets[room_id] = {}
         self.user_roles[room_id] = {}
         self._host_devices[room_id] = device_name
-        print(f"[Room] Created room {room_id} — host={host_id}, device={device_name}")
+        self._room_names[room_id] = room_name
+        self.user_display_names[room_id] = {}
+        self._timeline[room_id] = []
+        print(f"[Room] Created room {room_id} ({room_name or 'unnamed'}) — host={host_id}, device={device_name}")
         return room
+
+    def get_room_name(self, room_id: str) -> str:
+        return self._room_names.get(room_id, "")
 
     def get_rooms_list(self) -> list:
         """Return list of active rooms for the lobby."""
@@ -59,6 +71,7 @@ class RoomService:
             room_roles = self.user_roles.get(room_id, {})
             rooms_list.append({
                 "room_id": room_id,
+                "room_name": self._room_names.get(room_id, ""),
                 "member_count": len(room_roles),
                 "is_playing": room.is_playing,
                 "host_device": self._host_devices.get(room_id, "Unknown"),
@@ -66,7 +79,7 @@ class RoomService:
             })
         return rooms_list
 
-    def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
+    def join_room(self, room_id: str, user_id: str, ws: WebSocket, display_name: str = "") -> Optional[Role]:
         if room_id not in self.rooms:
             return None
 
@@ -80,11 +93,15 @@ class RoomService:
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
+        # Store display name (update on every join/reconnect if provided)
+        if display_name:
+            self.user_display_names.setdefault(room_id, {})[user_id] = display_name
+
         room_roles = self.user_roles.get(room_id, {})
 
         # If user already has a role in this room (reconnect), reuse it
         if user_id in room_roles:
-            print(f"[Room] User {user_id} reconnected with existing role {room_roles[user_id].value}")
+            print(f"[Room] User {user_id} ({display_name or 'anon'}) reconnected with existing role {room_roles[user_id].value}")
             return room_roles[user_id]
 
         # Assign next available role
@@ -99,7 +116,9 @@ class RoomService:
             assigned_role = Role.ENERGY
 
         self.user_roles.setdefault(room_id, {})[user_id] = assigned_role
-        print(f"[Room] Assigned {assigned_role.value} to user {user_id} in room {room_id}")
+        name_label = display_name or user_id[:8]
+        self.log_event(room_id, "join", f"{name_label} joined as {assigned_role.value}")
+        print(f"[Room] Assigned {assigned_role.value} to {name_label} in room {room_id}")
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
@@ -126,10 +145,29 @@ class RoomService:
             return True
         return False
 
+    def log_event(self, room_id: str, event_type: str, description: str):
+        """Append a timestamped event to the room's timeline (capped at 50)."""
+        if room_id not in self._timeline:
+            self._timeline[room_id] = []
+        event = {"time": time.time(), "source": event_type, "text": description}
+        self._timeline[room_id].append(event)
+        # Keep only the last 50 events
+        if len(self._timeline[room_id]) > 50:
+            self._timeline[room_id] = self._timeline[room_id][-50:]
+
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
             return
         self.rooms[room_id].current_inputs[role.value] = payload
+        # Log notable inputs to the timeline
+        summary_parts = []
+        for k, v in payload.items():
+            if k == "custom_prompt":
+                summary_parts.append(f'"{v}"')
+            else:
+                summary_parts.append(f"{k}: {v}")
+        if summary_parts:
+            self.log_event(room_id, "input", f"{role.value} → {', '.join(summary_parts)}")
         print(f"[Room] Input from {role.value}: {payload}")
 
     def update_after_arbitration(self, room_id: str, prompts, bpm: int, density: float, brightness: float):
@@ -152,9 +190,19 @@ class RoomService:
     def get_state_update_message(self, room_id: str) -> dict:
         room = self.rooms[room_id]
         room_roles = self.user_roles.get(room_id, {})
-        participants = [{"user_id": uid, "role": role.value} for uid, role in room_roles.items()]
+        display_names = self.user_display_names.get(room_id, {})
+        participants = [
+            {
+                "user_id": uid,
+                "role": role.value,
+                "display_name": display_names.get(uid, ""),
+            }
+            for uid, role in room_roles.items()
+        ]
+        timeline = self._timeline.get(room_id, [])[-20:]
         return {
             "type": "state_update",
+            "room_name": self._room_names.get(room_id, ""),
             "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
@@ -162,6 +210,7 @@ class RoomService:
             "current_inputs": room.current_inputs,
             "influence_weights": room.influence_weights,
             "participants": participants,
+            "timeline": timeline,
         }
 
     async def broadcast_json(self, room_id: str, message: dict):
