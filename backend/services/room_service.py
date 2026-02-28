@@ -127,7 +127,7 @@ class RoomService:
         participants = [{"user_id": uid, "role": role.value} for uid, role in room_roles.items()]
         return {
             "type": "state_update",
-            "active_prompts": [p.dict() for p in room.active_prompts],
+            "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
             "brightness": room.brightness,

@@ -176,10 +176,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "error", "message": "Only host can start music"})
                     continue
 
-                room.is_playing = True
-                await lyria_service.start_session(room_id, initial_bpm=room.bpm)
-                room_service.start_tick_loop(room_id, _arbitration_tick)
-                await room_service.broadcast_json(room_id, {"type": "music_started"})
+                try:
+                    room.is_playing = True
+                    await lyria_service.start_session(room_id, initial_bpm=room.bpm)
+                    room_service.start_tick_loop(room_id, _arbitration_tick)
+                    await room_service.broadcast_json(room_id, {"type": "music_started"})
+                except Exception as e:
+                    room.is_playing = False
+                    print(f"[WS] start_music failed for room {room_id}: {e}")
+                    await websocket.send_json({"type": "error", "message": f"Failed to start music: {str(e)}"})
 
             # ── STOP MUSIC ───────────────────────────────────────────────────
             elif msg_type == "stop_music":
