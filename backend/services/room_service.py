@@ -5,6 +5,7 @@ Manages room state, input collection, and the 4-second arbitration tick loop.
 import asyncio
 import uuid
 import json
+import time
 from typing import Dict, Set, Optional, Any
 from fastapi import WebSocket
 from models.schemas import RoomState, WeightedPrompt, Role
@@ -28,6 +29,8 @@ class RoomService:
         self._host_devices: Dict[str, str] = {}
         # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
+        # room_id → list of drop press timestamps
+        self._drop_presses: Dict[str, list] = {}
 
     def create_room(self, host_id: str, device_name: str = "Unknown") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
@@ -107,6 +110,21 @@ class RoomService:
             self.user_sockets[room_id].pop(user_id, None)
         # NOTE: Do NOT pop user_roles here — role persists across reconnects
         # Roles are only cleaned up when the room is destroyed
+
+    def record_drop(self, room_id: str) -> bool:
+        """Record a drop press. Returns True if 3+ drops within 2 seconds."""
+        now = time.time()
+        presses = self._drop_presses.setdefault(room_id, [])
+        presses.append(now)
+        # Remove presses older than 2 seconds
+        self._drop_presses[room_id] = [t for t in presses if now - t <= 2.0]
+        count = len(self._drop_presses[room_id])
+        print(f"[Room] DROP press for {room_id}: {count}/3 in window")
+        if count >= 3:
+            self._drop_presses[room_id] = []  # Reset after triggering
+            print(f"[Room] 🔥 DROP TRIGGERED for {room_id}!")
+            return True
+        return False
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
