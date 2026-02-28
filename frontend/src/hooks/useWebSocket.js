@@ -88,7 +88,7 @@ class WebSocketManager {
         this.store?.setPlaying(false)
         break
       case 'applause_level':
-        this.store?.setApplauseLevel(msg.level ?? 0)
+        this.store?.setApplauseLevel(msg.volume ?? 0)
         break
       case 'drop_progress':
       case 'drop_triggered':
