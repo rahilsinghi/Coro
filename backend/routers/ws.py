@@ -389,27 +389,63 @@ async def websocket_endpoint(websocket: WebSocket):
                     # drop_triggered is ALWAYS sent after the delay regardless of
                     # whether the Lyria call succeeds (separate try/except).
                     room = room_service.rooms.get(room_id)
-                    from google.genai import types as drop_types
                     drop_prompts = [
-                        drop_types.WeightedPrompt(
-                            text="massive bass drop with thundering sub-bass, distorted 808 kick, building tension release, crowd energy explosion",
+                        genai_types.WeightedPrompt(
+                            text="massive bass drop, thundering sub-bass, distorted 808 kick, crowd energy explosion, euphoric peak",
                             weight=0.7
                         ),
-                        drop_types.WeightedPrompt(
-                            text="intense electronic drop with rapid-fire hi-hats, aggressive synth stabs, maximum energy peak moment",
+                        genai_types.WeightedPrompt(
+                            text="intense electronic drop, driving beat, powerful climax, maximum energy release",
                             weight=0.3
                         ),
                     ]
-                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts, delay=DROP_DELAY):
-                        await asyncio.sleep(delay)
-                        if r:
+                    # Build-up steps fired at t=1s and t=2s during the countdown.
+                    # Each step ramps density/brightness and blends a tension overlay
+                    # on top of the current prompts — BPM is held constant so
+                    # reset_context() never fires and the audio stays continuous.
+                    build_steps = [
+                        (0.75, 0.80, 0.25),   # t=1s: subtle rise
+                        (0.92, 0.96, 0.50),   # t=2s: strong build
+                    ]
+                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts):
+                        for density_t, brightness_t, overlay_w in build_steps:
+                            await asyncio.sleep(1)
+                            if not (r and r.is_playing):
+                                break
+                            session_data = lyria_service._sessions.get(rid)
+                            if session_data:
+                                base = session_data.get("last_prompts") or [
+                                    genai_types.WeightedPrompt(text="ambient electronic music", weight=1.0)
+                                ]
+                                build_prompts = [
+                                    genai_types.WeightedPrompt(
+                                        text="rising tension, building energy, anticipation, crescendo",
+                                        weight=overlay_w,
+                                    )
+                                ] + base[:1]
+                                try:
+                                    await lyria_service.update_prompts(
+                                        room_id=rid,
+                                        prompts=build_prompts,
+                                        bpm=session_data.get("bpm", r.bpm),  # hold BPM — no reset_context()
+                                        density=density_t,
+                                        brightness=brightness_t,
+                                    )
+                                except Exception as e:
+                                    print(f"[WS] Drop build step failed (non-fatal): {e}")
+
+                        # t=3s: drop — keep same BPM so reset_context() never fires
+                        await asyncio.sleep(1)
+                        if r and r.is_playing:
                             try:
+                                session_data = lyria_service._sessions.get(rid)
+                                current_bpm = session_data.get("bpm", r.bpm) if session_data else r.bpm
                                 await lyria_service.update_prompts(
                                     room_id=rid,
                                     prompts=dp,
-                                    bpm=min(r.bpm + 20, 160),
+                                    bpm=current_bpm,  # same BPM — smooth prompt morph, no cut
                                     density=1.0,
-                                    brightness=0.3,
+                                    brightness=0.85,
                                 )
                             except Exception as e:
                                 print(f"[WS] Drop Lyria update failed (non-fatal): {e}")
