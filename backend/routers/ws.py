@@ -223,6 +223,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     except ValueError:
                         pass  # Unknown role, ignore
 
+            # ── APPLAUSE UPDATE ──────────────────────────────────────────────
+            elif msg_type == "applause_update":
+                if not room_id:
+                    continue
+                volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
+                room = room_service.rooms.get(room_id)
+                if room:
+                    # Smooth blend: 30% mic input, 70% existing state
+                    blended_density = round(room.density * 0.7 + volume * 0.3, 2)
+                    room.current_inputs["crowd_energy"] = {
+                        "applause_volume": round(volume, 2),
+                        "blended_density": blended_density,
+                    }
+                    print(f"[WS] Applause update room={room_id} volume={volume:.2f} blended_density={blended_density:.2f}")
+                    await room_service.broadcast_json(room_id, {
+                        "type": "applause_level",
+                        "volume": round(volume, 2),
+                    })
+
             # ── DROP ────────────────────────────────────────────────────────
             elif msg_type == "drop":
                 if not room_id:
