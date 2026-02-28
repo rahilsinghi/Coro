@@ -36,26 +36,26 @@ export default function Host() {
   return (
     <div className="min-h-screen flex flex-col p-6 max-w-6xl mx-auto pt-24 pb-12 pointer-events-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#00D1FF]/10 flex items-center justify-center border border-[#00D1FF]/20 shadow-[0_0_20px_rgba(0,209,255,0.1)]">
-            <span className="text-[#00D1FF] text-xl">🎙️</span>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 shrink-0 rounded-2xl bg-[#00D1FF]/10 flex items-center justify-center border border-[#00D1FF]/20 shadow-[0_0_20px_rgba(0,209,255,0.1)]">
+            <span className="text-[#00D1FF] text-lg">🎙️</span>
           </div>
           <div>
-            <h1 className="text-sm font-black text-white/40 uppercase tracking-[0.4em]">
+            <h1 className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">
               CORO <span className="text-[#00D1FF]/80">Studio Root</span>
             </h1>
-            <p className="flex items-center gap-2 text-xl font-bold mt-1 text-white">
+            <p className="flex flex-wrap items-center gap-2 text-base sm:text-xl font-bold mt-0.5 text-white">
               Room <span className="text-[#00D1FF] font-mono tracking-widest uppercase">{roomId}</span>
-              {isPlaying && <span className="ml-2 text-green-400 text-[10px] animate-pulse">● LIVE AUDIO</span>}
+              {isPlaying && <span className="text-green-400 text-[10px] animate-pulse">● LIVE</span>}
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowQR((v) => !v)}
-          className="btn-secondary text-xs uppercase tracking-widest py-3 px-8"
+          className="btn-secondary text-xs uppercase tracking-widest py-3 px-6 w-full sm:w-auto"
         >
-          {showQR ? 'Hide Session QR' : 'Show Session QR'}
+          {showQR ? 'Hide QR' : 'Show QR'}
         </button>
       </div>
 

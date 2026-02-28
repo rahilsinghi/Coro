@@ -69,12 +69,12 @@ export default function Home() {
         </div>
 
         {/* Dashboard Card */}
-        <div className="w-full max-w-xl glass-card p-10 md:p-14 space-y-10">
-          <div className="text-center space-y-4">
-            <h1 className="text-5xl font-black text-white tracking-tighter">
+        <div className="w-full max-w-xl glass-card p-6 sm:p-10 md:p-14 space-y-8">
+          <div className="text-center space-y-3">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter">
               Coro <span className="text-[#00D1FF]">Studio</span>
             </h1>
-            <p className="text-white/50 font-medium">Create a new session or join an existing session.</p>
+            <p className="text-white/50 font-medium text-sm sm:text-base">Create a new session or join an existing session.</p>
           </div>
 
           <div className="space-y-4">
@@ -92,7 +92,7 @@ export default function Home() {
               <div className="flex-1 h-px bg-current" />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 value={joinCode}
@@ -101,11 +101,13 @@ export default function Home() {
                 placeholder="EX: ABCDEF"
                 maxLength={6}
                 className="neon-input flex-1 font-mono tracking-widest text-center uppercase"
+                inputMode="text"
+                autoCapitalize="characters"
               />
               <button
                 onClick={handleJoin}
                 disabled={!joinCode.trim() || !isConnected || loading}
-                className="btn-secondary px-8 font-black"
+                className="btn-secondary px-8 font-black sm:w-auto w-full"
               >
                 Join
               </button>

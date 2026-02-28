@@ -57,6 +57,14 @@ export default function Guest() {
       {/* Role card */}
       <RoleCard role={roleInfo} />
 
+      {/* Task 7 — waiting indicator */}
+      {!isPlaying && (
+        <div className="mt-4 flex items-center justify-center gap-2 text-white/40 text-sm animate-pulse">
+          <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.6)]" />
+          Waiting for host to start music...
+        </div>
+      )}
+
       {/* Controls — render based on role */}
       <div className="mt-8 flex-1">
         {role === 'drummer' && <BPMSlider />}
