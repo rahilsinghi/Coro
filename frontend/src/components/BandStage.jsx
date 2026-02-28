@@ -184,7 +184,7 @@ const ROLE_SVG = {
     genre_dj: GuitaristSVG,
 }
 
-export default function BandStage({ participants = [], isPlaying = false, currentInputs = {} }) {
+export default function BandStage({ participants = [], isPlaying = false, currentInputs = {}, userId }) {
     // ── Comic chat bubbles ──
     const [bubbles, setBubbles] = useState({})
     const prevInputsRef = useRef({})
@@ -422,6 +422,18 @@ export default function BandStage({ participants = [], isPlaying = false, curren
                                     >
                                         {p.display_name || p.user_id?.slice(0, 8)}
                                     </p>
+                                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                                        {p.user_id === userId && (
+                                            <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#00D1FF]/15 text-[#00D1FF] border border-[#00D1FF]/30">
+                                                You
+                                            </span>
+                                        )}
+                                        {p.is_host && (
+                                            <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                Host
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-[9px] text-white/30 font-bold tracking-wide truncate">
                                         {roleInfo?.label || role}
                                     </p>

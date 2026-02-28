@@ -291,6 +291,7 @@ class RoomService:
                 "user_id": uid,
                 "role": role.value,
                 "display_name": display_names.get(uid, ""),
+                "is_host": uid == room.host_id,
             }
             for uid, role in room_roles.items()
         ]
