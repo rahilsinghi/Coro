@@ -132,37 +132,46 @@ class RoomService:
         # NOTE: Do NOT pop user_roles here — role persists across reconnects
         # Roles are only cleaned up when the room is destroyed
 
-    def record_drop(self, room_id: str, user_id: str) -> str:
+    def record_drop(self, room_id: str, connection_id: str, user_id: str = None) -> str:
         """
-        Record a drop vote from a specific user.
+        Record a drop vote, keyed by connection_id (one unique vote per WebSocket
+        connection, not per user_id, to avoid collisions when multiple tabs share
+        the same localStorage user_id during testing).
+
         Returns:
-          "triggered"    — 3 unique users voted in time; drop fires, window reset
+          "triggered"    — 3 unique connections voted in time; drop fires
           "registered"   — vote counted; not enough yet
-          "already_voted"— user already has a vote in the active window
+          "already_voted"— this connection already voted in the active window
         """
         now = time.time()
         votes = self._drop_votes.setdefault(room_id, {})
         window_start = self._drop_window_start.get(room_id)
 
-        # If window start exists but is stale (server-side safety net), clear it
+        # Stale window safety net
         if window_start and now - window_start > 5.5:
             votes.clear()
             self._drop_window_start[room_id] = None
             window_start = None
 
-        # Reject duplicate votes from the same user within active window
-        if user_id in votes:
+        # One vote per connection
+        if connection_id in votes:
             return "already_voted"
 
-        # Start window timestamp on first vote
+        # Start window on first vote
         if not votes:
             self._drop_window_start[room_id] = now
 
-        votes[user_id] = now
+        votes[connection_id] = now
         count = len(votes)
-        display_name = self.user_display_names.get(room_id, {}).get(user_id, user_id[:8])
-        self.log_event(room_id, "drop", f"{display_name} voted drop ({count}/3)")
-        print(f"[Room] DROP vote from {display_name} for {room_id}: {count}/3")
+
+        # Resolve display name for timeline
+        display = None
+        if user_id:
+            display = self.user_display_names.get(room_id, {}).get(user_id)
+        display = display or (user_id[:8] if user_id else "anon")
+
+        self.log_event(room_id, "drop", f"{display} voted drop ({count}/3)")
+        print(f"[Room] DROP vote from {display} (conn={connection_id[:8]}) for {room_id}: {count}/3")
 
         if count >= 3:
             votes.clear()

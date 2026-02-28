@@ -99,6 +99,7 @@ class WebSocketManager {
         this.store?.setApplauseLevel(msg.volume ?? 0)
         break
       case 'drop_progress':
+      case 'drop_incoming':
       case 'drop_triggered':
       case 'drop_reset':
       case 'drop_already_voted':
