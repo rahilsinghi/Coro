@@ -8,6 +8,7 @@ export const useRoomStore = create((set) => ({
   isHost: false,
   isConnected: false,
   isPlaying: false,
+  hasEnteredCoro: sessionStorage.getItem('hasEnteredCoro') === 'true',
 
   // Music state (from server state_update)
   activePrompts: [],
@@ -18,7 +19,10 @@ export const useRoomStore = create((set) => ({
   influenceWeights: {},
   geminiReasoning: '',
 
-  // Actions
+  setEnteredCoro: (val) => {
+    sessionStorage.setItem('hasEnteredCoro', val)
+    set({ hasEnteredCoro: val })
+  },
   setRoom: (roomId, userId, role, isHost) =>
     set({ roomId, userId, role, isHost }),
 

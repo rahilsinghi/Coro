@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { useRoomStore } from '../../store/roomStore'
 import { useWebSocket } from '../../hooks/useWebSocket'
 
@@ -6,11 +6,17 @@ export default function BPMSlider() {
   const [bpm, setBpm] = useState(100)
   const { userId, roomId } = useRoomStore()
   const { sendInput } = useWebSocket()
+  const debounceRef = useRef(null)
 
   const handleChange = useCallback((e) => {
     const val = Number(e.target.value)
     setBpm(val)
-    sendInput(userId, roomId, 'drummer', { bpm: val })
+
+    // Debounce: only send after user stops moving for 300ms
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      sendInput(userId, roomId, 'drummer', { bpm: val })
+    }, 300)
   }, [userId, roomId, sendInput])
 
   return (

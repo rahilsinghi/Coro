@@ -3,15 +3,24 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home.jsx'
 import Host from './pages/Host.jsx'
 import Guest from './pages/Guest.jsx'
+import GlobeExperience from './components/GlobeExperience.jsx'
+import { useAudioPlayer } from './hooks/useAudioPlayer'
 
 export default function App() {
+  const { getAnalyser } = useAudioPlayer()
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/host" element={<Host />} />
-        <Route path="/guest" element={<Guest />} />
-      </Routes>
+      <div className="relative min-h-screen">
+        <GlobeExperience analyser={getAnalyser()} />
+        <main className="relative z-10 overflow-x-hidden">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/host" element={<Host />} />
+            <Route path="/guest" element={<Guest />} />
+          </Routes>
+        </main>
+      </div>
     </BrowserRouter>
   )
 }

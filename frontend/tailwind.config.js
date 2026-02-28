@@ -6,10 +6,10 @@ export default {
       colors: {
         // CrowdSynth brand colors — dark neon theme
         cs: {
-          bg: '#0a0a0f',
-          surface: '#12121a',
-          border: '#1e1e2e',
-          accent: '#7c3aed',     // purple
+          bg: '#001a33',
+          surface: '#002b4d',
+          border: '#004080',
+          accent: '#00c3ff',     // vibrant blue
           accent2: '#06b6d4',    // cyan
           accent3: '#f59e0b',    // amber
           text: '#e2e8f0',
@@ -26,8 +26,8 @@ export default {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 5px #7c3aed, 0 0 10px #7c3aed' },
-          '100%': { boxShadow: '0 0 20px #7c3aed, 0 0 40px #7c3aed' },
+          '0%': { boxShadow: '0 0 5px #00c3ff, 0 0 10px #00c3ff' },
+          '100%': { boxShadow: '0 0 20px #00c3ff, 0 0 40px #00c3ff' },
         }
       }
     },
