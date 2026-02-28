@@ -29,8 +29,10 @@ class RoomService:
         self._host_devices: Dict[str, str] = {}
         # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
-        # room_id → list of drop press timestamps
-        self._drop_presses: Dict[str, list] = {}
+        # room_id → { user_id: timestamp } for the current drop vote window
+        self._drop_votes: Dict[str, Dict[str, float]] = {}
+        # room_id → timestamp when the current drop window started (None if no active window)
+        self._drop_window_start: Dict[str, Optional[float]] = {}
         # room_id → custom room name
         self._room_names: Dict[str, str] = {}
         # room_id → user_id → display name
@@ -130,20 +132,54 @@ class RoomService:
         # NOTE: Do NOT pop user_roles here — role persists across reconnects
         # Roles are only cleaned up when the room is destroyed
 
-    def record_drop(self, room_id: str) -> bool:
-        """Record a drop press. Returns True if 3+ drops within 2 seconds."""
+    def record_drop(self, room_id: str, user_id: str) -> str:
+        """
+        Record a drop vote from a specific user.
+        Returns:
+          "triggered"    — 3 unique users voted in time; drop fires, window reset
+          "registered"   — vote counted; not enough yet
+          "already_voted"— user already has a vote in the active window
+        """
         now = time.time()
-        presses = self._drop_presses.setdefault(room_id, [])
-        presses.append(now)
-        # Remove presses older than 2 seconds
-        self._drop_presses[room_id] = [t for t in presses if now - t <= 2.0]
-        count = len(self._drop_presses[room_id])
-        print(f"[Room] DROP press for {room_id}: {count}/3 in window")
+        votes = self._drop_votes.setdefault(room_id, {})
+        window_start = self._drop_window_start.get(room_id)
+
+        # If window start exists but is stale (server-side safety net), clear it
+        if window_start and now - window_start > 5.5:
+            votes.clear()
+            self._drop_window_start[room_id] = None
+            window_start = None
+
+        # Reject duplicate votes from the same user within active window
+        if user_id in votes:
+            return "already_voted"
+
+        # Start window timestamp on first vote
+        if not votes:
+            self._drop_window_start[room_id] = now
+
+        votes[user_id] = now
+        count = len(votes)
+        display_name = self.user_display_names.get(room_id, {}).get(user_id, user_id[:8])
+        self.log_event(room_id, "drop", f"{display_name} voted drop ({count}/3)")
+        print(f"[Room] DROP vote from {display_name} for {room_id}: {count}/3")
+
         if count >= 3:
-            self._drop_presses[room_id] = []  # Reset after triggering
+            votes.clear()
+            self._drop_window_start[room_id] = None
+            self.log_event(room_id, "drop", "🔥 DROP TRIGGERED!")
             print(f"[Room] 🔥 DROP TRIGGERED for {room_id}!")
-            return True
-        return False
+            return "triggered"
+
+        return "registered"
+
+    def reset_drop_votes(self, room_id: str):
+        """Reset drop votes after window expiry."""
+        self._drop_votes.setdefault(room_id, {}).clear()
+        self._drop_window_start[room_id] = None
+
+    def get_drop_vote_count(self, room_id: str) -> int:
+        return len(self._drop_votes.get(room_id, {}))
 
     def log_event(self, room_id: str, event_type: str, description: str):
         """Append a timestamped event to the room's timeline (capped at 50)."""

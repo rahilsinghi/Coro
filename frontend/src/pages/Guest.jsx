@@ -10,6 +10,7 @@ import MoodInput from '../components/controls/MoodInput.jsx'
 import GenreGrid from '../components/controls/GenreGrid.jsx'
 import InstrumentGrid from '../components/controls/InstrumentGrid.jsx'
 import EnergyControl from '../components/controls/EnergyControl.jsx'
+import DropButton from '../components/DropButton.jsx'
 import { ROLES, PROMPT_HINTS } from '../lib/constants.js'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
 
@@ -165,10 +166,6 @@ export default function Guest() {
   const { send, sendInput, addListener } = useWebSocket()
   const [tab, setTab] = useState('studio')
 
-  // Drop button state
-  const [dropProgress, setDropProgress] = useState(0)
-  const [showShock, setShowShock] = useState(false)
-
   // Applause / mic state
   const [micEnabled, setMicEnabled] = useState(false)
   const micStreamRef = useRef(null)
@@ -184,22 +181,6 @@ export default function Guest() {
     }
   }, [unlock])
 
-  // Listen for drop WS events (drop_progress / drop_triggered)
-  useEffect(() => {
-    const cleanup = addListener((msg) => {
-      if (msg.type === 'drop_progress') {
-        setDropProgress(msg.count ?? 0)
-      }
-      if (msg.type === 'drop_triggered') {
-        document.body.classList.add('drop-flash')
-        navigator.vibrate?.([200, 100, 200])
-        setTimeout(() => document.body.classList.remove('drop-flash'), 1000)
-        setDropProgress(0)
-      }
-    })
-    return cleanup
-  }, [addListener])
-
   // Cleanup mic stream on unmount
   useEffect(() => {
     return () => {
@@ -209,13 +190,6 @@ export default function Guest() {
       }
     }
   }, [])
-
-  const handleDrop = () => {
-    send({ type: 'drop', user_id: userId, room_id: roomId })
-    navigator.vibrate?.(100)
-    setShowShock(true)
-    setTimeout(() => setShowShock(false), 700)
-  }
 
   const toggleMic = async () => {
     if (micEnabled) {
@@ -425,34 +399,7 @@ export default function Guest() {
               </div>
 
               {/* ── DROP BUTTON ── */}
-              {isPlaying && (
-                <div className="relative mt-2">
-                  {/* Shockwave ring */}
-                  {showShock && (
-                    <div
-                      className="shockwave absolute inset-0 rounded-2xl pointer-events-none"
-                      style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.45) 0%, transparent 70%)' }}
-                    />
-                  )}
-                  <button
-                    onClick={handleDrop}
-                    className="w-full py-6 rounded-2xl text-white text-2xl font-black uppercase tracking-widest transition-transform active:scale-95"
-                    style={{
-                      background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
-                      boxShadow: '0 0 30px rgba(239,68,68,0.50)',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
-                    onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
-                  >
-                    DROP
-                  </button>
-                  {dropProgress > 0 && (
-                    <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
-                      {dropProgress}/3 ready...
-                    </p>
-                  )}
-                </div>
-              )}
+              {isPlaying && <DropButton userId={userId} roomId={roomId} />}
             </div>
           )}
         </>

@@ -253,9 +253,16 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "drop":
                 if not room_id:
                     continue
-                triggered = room_service.record_drop(room_id)
-                if triggered:
-                    # Override Gemini — force a drop prompt directly to Lyria
+                result = room_service.record_drop(room_id, user_id)
+
+                if result == "already_voted":
+                    await websocket.send_json({
+                        "type": "drop_already_voted",
+                        "count": room_service.get_drop_vote_count(room_id),
+                        "needed": 3,
+                    })
+
+                elif result == "triggered":
                     from google.genai import types as drop_types
                     drop_prompts = [
                         drop_types.WeightedPrompt(
@@ -280,14 +287,25 @@ async def websocket_endpoint(websocket: WebSocket):
                             "type": "drop_triggered",
                             "message": "🔥 DROP!"
                         })
-                else:
-                    # Broadcast drop count so UI can show building pressure
-                    count = len(room_service._drop_presses.get(room_id, []))
+
+                elif result == "registered":
+                    count = room_service.get_drop_vote_count(room_id)
                     await room_service.broadcast_json(room_id, {
                         "type": "drop_progress",
                         "count": count,
                         "needed": 3,
                     })
+                    # On first vote, start 5-second expiry window
+                    if count == 1:
+                        async def _expire_drop(rid=room_id):
+                            await asyncio.sleep(5.0)
+                            if room_service.get_drop_vote_count(rid) > 0:
+                                room_service.reset_drop_votes(rid)
+                                await room_service.broadcast_json(rid, {
+                                    "type": "drop_reset",
+                                    "message": "Not enough votes — try again",
+                                })
+                        asyncio.create_task(_expire_drop())
 
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected: user={user_id}, room={room_id}")
