@@ -161,10 +161,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "error", "message": f"Room {room_id} not found"})
                     continue
                 role = room_service.join_room(room_id, user_id, websocket)
+                if role is None:
+                    await websocket.send_json({"type": "error", "message": "Room is full (max 10 players)"})
+                    continue
                 await websocket.send_json({
                     "type": "joined",
                     "room_id": room_id,
-                    "role": role.value if role else None,
+                    "role": role.value,
                     "user_id": user_id,
                 })
                 # Broadcast updated participants to all clients in the room
