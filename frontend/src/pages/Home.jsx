@@ -116,7 +116,14 @@ export default function Home() {
             </div>
 
             {error && (
-              <p className="text-red-400 text-xs font-black text-center animate-pulse">{error}</p>
+              <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black text-center justify-center
+                ${error.toLowerCase().includes('full')
+                  ? 'bg-yellow-400/10 border border-yellow-400/30 text-yellow-400'
+                  : 'bg-red-400/10 border border-red-400/20 text-red-400 animate-pulse'
+                }`}
+              >
+                {error.toLowerCase().includes('full') ? '🚫' : '⚠️'} {error}
+              </div>
             )}
           </div>
         </div>
