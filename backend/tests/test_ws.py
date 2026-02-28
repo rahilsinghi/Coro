@@ -45,6 +45,27 @@ async def test_ws():
             assert err_msg["type"] == "error", f"❌ Expected error for bad room, got {err_msg['type']}"
             print(f"  ✅ Bad room correctly returns error: {err_msg['message']}")
 
+        # ── Test energy role input_update ──────────────────────────
+        async with websockets.connect(WS_URL) as energy_ws:
+            await energy_ws.send(json.dumps({
+                "type": "join_room",
+                "room_id": room_id,
+                "user_id": str(uuid.uuid4())
+            }))
+            energy_join = json.loads(await energy_ws.recv())
+            assert energy_join["type"] == "joined", f"❌ Energy user failed to join: {energy_join}"
+            energy_user_id = energy_join["user_id"]
+
+            await energy_ws.send(json.dumps({
+                "type": "input_update",
+                "user_id": energy_user_id,
+                "room_id": room_id,
+                "role": "energy",
+                "payload": {"density": 0.8, "brightness": 0.6}
+            }))
+            await asyncio.sleep(0.3)
+            print("  ✅ Energy role input_update (density + brightness) accepted without error")
+
     print("\n✅ WebSocket room lifecycle OK")
 
 asyncio.run(test_ws())

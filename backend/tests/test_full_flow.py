@@ -34,15 +34,16 @@ async def test_full_flow():
             "room_id": room_id
         }))
 
-        # 4. Wait for music_started confirmation
+        # 4. Wait for music_started confirmation (or server error if Lyria fails)
         music_started = False
         audio_chunk_count = 0
         state_update_received = False
+        server_error_msg = None
 
         print("  Waiting for music_started + audio chunks...")
 
         async def collect():
-            nonlocal music_started, audio_chunk_count, state_update_received
+            nonlocal music_started, audio_chunk_count, state_update_received, server_error_msg
             async for message in ws:
                 if isinstance(message, bytes):
                     audio_chunk_count += 1
@@ -57,13 +58,17 @@ async def test_full_flow():
                     elif msg["type"] == "state_update":
                         state_update_received = True
                         print(f"    ✅ state_update received: {msg.get('active_prompts', [])}")
+                    elif msg.get("type") == "error":
+                        server_error_msg = msg.get("message", "Unknown error")
+                        print(f"    ⚠️ Server error (e.g. Lyria/SSL): {server_error_msg}")
+                        return
 
         try:
             await asyncio.wait_for(collect(), timeout=40.0)
         except asyncio.TimeoutError:
             print("  ⚠️  Timed out waiting — partial results:")
 
-        # 5. Stop music
+        # 5. Stop music (no-op if music never started)
         await ws.send(json.dumps({
             "type": "stop_music",
             "user_id": host_id,
@@ -73,7 +78,13 @@ async def test_full_flow():
         print(f"\n  music_started: {music_started}")
         print(f"  audio chunks received: {audio_chunk_count}")
         print(f"  state_update received: {state_update_received}")
+        if server_error_msg:
+            print(f"  server_error: {server_error_msg}")
 
+        if server_error_msg:
+            raise AssertionError(
+                f"❌ Lyria failed to start (use python tests/run_e2e.py --skip-full to skip). Error: {server_error_msg}"
+            )
         assert music_started, "❌ music_started was never received"
         assert audio_chunk_count >= 1, "❌ No audio chunks received over WebSocket"
 

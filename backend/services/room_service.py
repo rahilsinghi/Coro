@@ -49,7 +49,11 @@ class RoomService:
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
-        # Assign next available role
+        # If reconnecting, reuse existing role so phone screen-off doesn't lose their slot
+        if user_id in self.user_roles:
+            return self.user_roles[user_id]
+
+        # Assign next available role for new users
         taken_roles = set(self.user_roles.values())
         assigned_role = None
         for role in self._role_queue:
@@ -68,7 +72,7 @@ class RoomService:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        self.user_roles.pop(user_id, None)
+        # Intentionally keep user_roles entry so reconnecting users get their original role back
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
@@ -97,7 +101,7 @@ class RoomService:
         room = self.rooms[room_id]
         return {
             "type": "state_update",
-            "active_prompts": [p.dict() for p in room.active_prompts],
+            "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
             "brightness": room.brightness,
