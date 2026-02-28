@@ -34,14 +34,6 @@ class WebSocketManager {
     ws.onopen = () => {
       console.log('[WS] Connected')
       this.store?.setConnected(true)
-
-      // Auto-rejoin room if we have a persisted session (e.g. page refresh)
-      const saved = JSON.parse(sessionStorage.getItem('cs_room') || 'null')
-      if (saved?.roomId && saved?.userId) {
-        const displayName = localStorage.getItem('cs_display_name') || ''
-        console.log('[WS] Rejoining room', saved.roomId, 'as', saved.userId, displayName)
-        this.send({ type: 'join_room', room_id: saved.roomId, user_id: saved.userId, display_name: displayName })
-      }
     }
 
     ws.onclose = () => {
@@ -100,7 +92,7 @@ class WebSocketManager {
         break
       case 'room_closed':
         console.log('[WS] Room closed by host:', msg.message)
-        this.store?.reset()
+        this.store?.clearRoom()
         break
       case 'drop_progress':
         this.store?.setDropProgress(msg.count)
@@ -232,7 +224,11 @@ export function useWebSocket() {
     store.clearRoom()
   }, [send, store])
 
+  const updateDisplayName = useCallback((userId, roomId, displayName) => {
+    send({ type: 'update_display_name', user_id: userId, room_id: roomId, display_name: displayName })
+  }, [send])
+
   const addListener = useCallback((cb) => manager.addListener(cb), [])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, addListener }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, updateDisplayName, addListener }
 }

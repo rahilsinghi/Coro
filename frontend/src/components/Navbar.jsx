@@ -321,7 +321,8 @@ function PromptModal({ isOpen, onClose }) {
 }
 
 export default function Navbar() {
-    const { isAuthed, displayName, setAuthed, setEnteredCoro } = useRoomStore()
+    const { isAuthed, displayName, setAuthed, setEnteredCoro, roomId, userId } = useRoomStore()
+    const { updateDisplayName } = useWebSocket()
     const [showAuthModal, setShowAuthModal] = useState(false)
     const [showHowModal, setShowHowModal] = useState(false)
     const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -392,7 +393,13 @@ export default function Navbar() {
 
                 {isAuthed ? (
                     <div className="flex items-center gap-4">
-                        <span className="text-white/70 text-sm font-bold">{displayName}</span>
+                        <button
+                            onClick={() => setShowAuthModal(true)}
+                            className="text-white/70 hover:text-[#00D1FF] text-sm font-bold transition-colors cursor-pointer"
+                            title="Click to change name"
+                        >
+                            {displayName || 'Set Name'}
+                        </button>
                         <button
                             onClick={() => setAuthed(false, '')}
                             className="text-white/40 hover:text-white/70 transition-colors text-xs font-medium"
@@ -412,7 +419,14 @@ export default function Navbar() {
 
             <AuthModals
                 isOpen={showAuthModal}
-                onClose={() => setShowAuthModal(false)}
+                onClose={() => {
+                    setShowAuthModal(false)
+                    // Push updated name to backend if already in a room
+                    const updatedName = localStorage.getItem('cs_display_name') || ''
+                    if (roomId && userId && updatedName) {
+                        updateDisplayName(userId, roomId, updatedName)
+                    }
+                }}
             />
             <HowItWorksModal
                 isOpen={showHowModal}

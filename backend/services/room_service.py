@@ -140,20 +140,6 @@ class RoomService:
         if room_id in self.user_display_names:
             self.user_display_names[room_id].pop(user_id, None)
 
-    def destroy_room(self, room_id: str):
-        """Cleanup all room state and stop the tick loop."""
-        self.stop_tick_loop(room_id)
-        self.rooms.pop(room_id, None)
-        self.connections.pop(room_id, None)
-        self.user_sockets.pop(room_id, None)
-        self.user_roles.pop(room_id, None)
-        self._host_devices.pop(room_id, None)
-        self._drop_presses.pop(room_id, None)
-        self._room_names.pop(room_id, None)
-        self.user_display_names.pop(room_id, None)
-        self._timeline.pop(room_id, None)
-        print(f"[Room] Destroyed room {room_id}")
-
     def get_drop_threshold(self, room_id: str) -> int:
         """Required votes = ceil(participants / 2), minimum 1."""
         import math

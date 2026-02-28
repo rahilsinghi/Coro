@@ -7,6 +7,14 @@ export default function AuthModals({ isOpen, onClose }) {
     const { setAuthed } = useRoomStore()
     const [name, setName] = useState('')
 
+    // Reset / pre-fill name when the modal opens
+    useEffect(() => {
+        if (isOpen) {
+            const current = localStorage.getItem('cs_display_name') || ''
+            setName(current)
+        }
+    }, [isOpen])
+
     // Escape closes modal + scroll lock
     useEffect(() => {
         if (!isOpen) return

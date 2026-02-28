@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useRoomStore } from '../store/roomStore'
@@ -15,25 +15,27 @@ export default function GlobeExperience() {
     const isLanding = location.pathname === '/'
     const showHero = !hasEnteredCoro && isLanding
     const [showNameModal, setShowNameModal] = useState(false)
+    // Track where to navigate after auth completes
+    const pendingDest = useRef('/studio')
 
-    const proceedToStudio = () => {
+    const proceedTo = (dest) => {
         setEnteredCoro(true)
-        navigate('/studio')
+        navigate(dest)
     }
 
-    const handleEnter = () => {
+    const handleAction = (dest) => {
+        pendingDest.current = dest
         if (!isAuthed) {
             setShowNameModal(true)
             return
         }
-        proceedToStudio()
+        proceedTo(dest)
     }
 
     const handleNameModalClose = () => {
         setShowNameModal(false)
-        // After setting name, proceed to studio
         const name = localStorage.getItem('cs_display_name')
-        if (name) proceedToStudio()
+        if (name) proceedTo(pendingDest.current)
     }
 
     return (
@@ -72,7 +74,7 @@ export default function GlobeExperience() {
                         className="fixed inset-0 z-[200] flex items-center justify-center px-4"
                         style={{ pointerEvents: 'none' }}
                     >
-                        {/* Card — pointer-events-auto so all children are clickable */}
+                        {/* Card */}
                         <div
                             className="flex flex-col items-center text-center w-full"
                             style={{
@@ -116,7 +118,7 @@ export default function GlobeExperience() {
                                 />
                             </div>
 
-                            {/* ── Line 1: "The Room Decides The Rhythm" (smaller) ── */}
+                            {/* ── Line 1 ── */}
                             <p
                                 className="font-display font-semibold text-white leading-tight tracking-tight whitespace-nowrap"
                                 style={{
@@ -127,7 +129,7 @@ export default function GlobeExperience() {
                                 The Room Decides The Rhythm
                             </p>
 
-                            {/* ── Line 2: "Music, Made By Everyone" (bigger, bolder) ── */}
+                            {/* ── Line 2 ── */}
                             <p
                                 className="font-display font-bold text-white leading-tight tracking-tighter whitespace-nowrap mb-5"
                                 style={{
@@ -138,7 +140,7 @@ export default function GlobeExperience() {
                                 Music, Made By Everyone
                             </p>
 
-                            {/* ── Description line ── */}
+                            {/* ── Description ── */}
                             <p
                                 className="font-medium whitespace-nowrap mb-7"
                                 style={{
@@ -150,51 +152,76 @@ export default function GlobeExperience() {
                                 musical sphere.
                             </p>
 
-                            {/* ── CTA Button ── */}
-                            <button
-                                onClick={handleEnter}
-                                className="group relative overflow-hidden flex items-center gap-3 font-black text-black rounded-full transition-transform active:scale-95"
-                                style={{
-                                    background: '#00D1FF',
-                                    padding: '0.95rem 2.4rem',
-                                    fontSize: '1rem',
-                                    boxShadow: '0 12px 36px rgba(0,209,255,0.30)',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#00E5FF'
-                                    e.currentTarget.style.boxShadow =
-                                        '0 18px 55px rgba(0,209,255,0.52)'
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#00D1FF'
-                                    e.currentTarget.style.boxShadow =
-                                        '0 12px 36px rgba(0,209,255,0.30)'
-                                }}
-                            >
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
-                                <span className="relative z-10">
-                                    Enter CORO Studio
-                                </span>
-                                <svg
-                                    className="relative z-10 w-4 h-4 group-hover:translate-x-1 transition-transform"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
+                            {/* ── Two CTA Buttons ── */}
+                            <div className="flex items-center gap-3 w-full max-w-sm">
+                                {/* Create Room — primary */}
+                                <button
+                                    onClick={() => handleAction('/studio')}
+                                    className="group relative overflow-hidden flex-1 flex items-center justify-center gap-2 font-black text-black rounded-full transition-transform active:scale-95"
+                                    style={{
+                                        background: '#00D1FF',
+                                        padding: '0.85rem 1.6rem',
+                                        fontSize: '0.88rem',
+                                        boxShadow: '0 12px 36px rgba(0,209,255,0.30)',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#00E5FF'
+                                        e.currentTarget.style.boxShadow = '0 18px 55px rgba(0,209,255,0.52)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = '#00D1FF'
+                                        e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,209,255,0.30)'
+                                    }}
                                 >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={3}
-                                        d="M14 5l7 7m0 0l-7 7m7-7H3"
-                                    />
-                                </svg>
-                            </button>
+                                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
+                                    <span className="relative z-10">Create Room</span>
+                                    <svg
+                                        className="relative z-10 w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </button>
+
+                                {/* Join Session — secondary / outline */}
+                                <button
+                                    onClick={() => handleAction('/guest')}
+                                    className="group relative overflow-hidden flex-1 flex items-center justify-center gap-2 font-black rounded-full transition-all active:scale-95"
+                                    style={{
+                                        background: 'transparent',
+                                        padding: '0.85rem 1.6rem',
+                                        fontSize: '0.88rem',
+                                        border: '1.5px solid rgba(0,209,255,0.45)',
+                                        color: '#00D1FF',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(0,209,255,0.08)'
+                                        e.currentTarget.style.borderColor = 'rgba(0,209,255,0.7)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'transparent'
+                                        e.currentTarget.style.borderColor = 'rgba(0,209,255,0.45)'
+                                    }}
+                                >
+                                    <span className="relative z-10">Join Session</span>
+                                    <svg
+                                        className="relative z-10 w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Name entry modal — shown when user hasn't set a display name */}
+            {/* Name entry modal */}
             <AuthModals isOpen={showNameModal} onClose={handleNameModalClose} />
         </>
     )

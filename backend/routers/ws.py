@@ -431,6 +431,17 @@ async def websocket_endpoint(websocket: WebSocket):
                                 })
                         asyncio.create_task(_expire_drop())
 
+            # ── UPDATE DISPLAY NAME ────────────────────────────────────────
+            elif msg_type == "update_display_name":
+                if room_id and user_id:
+                    new_name = msg.get("display_name", "")
+                    if new_name:
+                        room_service.user_display_names.setdefault(room_id, {})[user_id] = new_name
+                        # Broadcast updated state so all clients see the new name
+                        if room_id in room_service.rooms:
+                            state_msg = room_service.get_state_update_message(room_id)
+                            await room_service.broadcast_json(room_id, state_msg)
+
             # ── LEAVE ROOM ──────────────────────────────────────────────────
             elif msg_type == "leave_room":
                 if room_id and user_id:
