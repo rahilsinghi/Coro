@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
+import BandStage from '../components/BandStage.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 import Timeline from '../components/Timeline.jsx'
@@ -91,8 +92,11 @@ export default function Host() {
           {/* ── MAIN GRID ── */}
           <div className="flex flex-col lg:flex-row gap-6 flex-1">
 
-            {/* LEFT — Visualizer (2/3 width) */}
+            {/* LEFT — Stage + Visualizer (2/3 width) */}
             <div className="flex-1 flex flex-col gap-6 lg:w-2/3">
+
+              {/* Band Stage — animated SVG characters */}
+              <BandStage participants={participants} isPlaying={isPlaying} currentInputs={currentInputs} />
 
               {/* Live Audio Visualizer card */}
               <div

@@ -11,6 +11,7 @@ import GenreGrid from '../components/controls/GenreGrid.jsx'
 import InstrumentGrid from '../components/controls/InstrumentGrid.jsx'
 import EnergyControl from '../components/controls/EnergyControl.jsx'
 import DropButton from '../components/DropButton.jsx'
+import BandStage from '../components/BandStage.jsx'
 import { ROLES, PROMPT_HINTS } from '../lib/constants.js'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
 
@@ -333,34 +334,9 @@ export default function Guest() {
                 </div>
               </div>
 
-              {/* Band Activity — what other roles are doing */}
-              {otherParticipants.length > 0 && (
-                <div
-                  className="rounded-[1.25rem] p-5"
-                  style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0,209,255,0.14)' }}
-                >
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00D1FF]/60 mb-3">Band Activity</p>
-                  <div className="space-y-2">
-                    {otherParticipants.map((p) => {
-                      const pRoleInfo = ROLES[p.role]
-                      const inputSummary = formatInputSummary(currentInputs[p.role])
-                      return (
-                        <div key={p.user_id} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.03] border border-white/5">
-                          <span className="text-base">{pRoleInfo?.emoji || '🎵'}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-white/70">
-                              {p.display_name || p.user_id.slice(0, 8)}
-                              <span className="text-white/30 font-normal ml-2">{pRoleInfo?.label || p.role}</span>
-                            </p>
-                            {inputSummary && (
-                              <p className="text-[10px] text-white/40 truncate">{inputSummary}</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+              {/* Band Stage — visual stage showing all participants */}
+              {participants.length > 0 && (
+                <BandStage participants={participants} isPlaying={isPlaying} currentInputs={currentInputs} />
               )}
 
               {/* Active prompts mini display */}

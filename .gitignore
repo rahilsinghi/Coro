@@ -28,3 +28,4 @@ Thumbs.db
 # Claude Code agent memory (machine-local)
 .claude/
 .playwright-mcp
+.vercel
