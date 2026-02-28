@@ -98,6 +98,10 @@ class WebSocketManager {
       case 'applause_level':
         this.store?.setApplauseLevel(msg.volume ?? 0)
         break
+      case 'room_closed':
+        console.log('[WS] Room closed by host:', msg.message)
+        this.store?.reset()
+        break
       case 'drop_progress':
       case 'drop_incoming':
       case 'drop_triggered':
@@ -191,6 +195,10 @@ export function useWebSocket() {
     send({ type: 'stop_music', user_id: userId, room_id: roomId })
   }, [send])
 
+  const closeRoom = useCallback((userId, roomId) => {
+    send({ type: 'close_room', user_id: userId, room_id: roomId })
+  }, [send])
+
   const sendInput = useCallback((userId, roomId, role, payload) => {
     send({
       type: 'input_update',
@@ -201,5 +209,5 @@ export function useWebSocket() {
     })
   }, [send])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput, addListener: (cb) => manager.addListener(cb) }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, addListener: (cb) => manager.addListener(cb) }
 }
