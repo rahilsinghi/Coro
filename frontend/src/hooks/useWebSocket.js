@@ -100,6 +100,10 @@ class WebSocketManager {
       case 'applause_level':
         this.store?.setApplauseLevel(msg.volume ?? 0)
         break
+      case 'role_changed':
+        console.log('[WS] Role changed:', msg.old_role, '→', msg.role)
+        this.store?.setRole(msg.role)
+        break
       case 'room_closed':
         console.log('[WS] Room closed by host:', msg.message)
         this.store?.clearRoom()
@@ -236,11 +240,16 @@ export function useWebSocket() {
     store.clearRoom()
   }, [send, store])
 
+  const changeRole = useCallback((userId, roomId, newRole) => {
+    store.setRole(newRole)
+    send({ type: 'change_role', user_id: userId, room_id: roomId, role: newRole })
+  }, [send, store])
+
   const updateDisplayName = useCallback((userId, roomId, displayName) => {
     send({ type: 'update_display_name', user_id: userId, room_id: roomId, display_name: displayName })
   }, [send])
 
   const addListener = useCallback((cb) => manager.addListener(cb), [])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, updateDisplayName, addListener }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, changeRole, updateDisplayName, addListener }
 }

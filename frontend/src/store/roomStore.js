@@ -56,6 +56,7 @@ export const useRoomStore = create((set) => ({
 
   setConnected: (val) => set({ isConnected: val }),
   setPlaying: (val) => set({ isPlaying: val }),
+  setRole: (val) => set({ role: val }),
   setApplauseLevel: (val) => set({ applauseLevel: val }),
   setDropProgress: (val) => set({ dropProgress: val }),
   setTimeline: (val) => set({ timeline: val }),
