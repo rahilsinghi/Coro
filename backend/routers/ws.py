@@ -118,6 +118,15 @@ async def websocket_endpoint(websocket: WebSocket):
             msg_type = msg.get("type")
             user_id = msg.get("user_id", user_id)
 
+            # On reconnect, restore room_id from the message if we lost it
+            if not room_id and msg.get("room_id"):
+                room_id = msg["room_id"].upper()
+                # Re-register this WebSocket so broadcasts reach this client
+                if room_id in room_service.rooms and user_id:
+                    room_service.connections.setdefault(room_id, set()).add(websocket)
+                    room_service.user_sockets.setdefault(room_id, {})[user_id] = websocket
+                    print(f"[WS] Reconnected user={user_id} to room={room_id}")
+
             # ── CREATE ROOM ──────────────────────────────────────────────────
             if msg_type == "create_room":
                 room = room_service.create_room(host_id=user_id)
