@@ -132,6 +132,12 @@ class RoomService:
         # NOTE: Do NOT pop user_roles here — role persists across reconnects
         # Roles are only cleaned up when the room is destroyed
 
+    def get_drop_threshold(self, room_id: str) -> int:
+        """Required votes = ceil(participants / 2), minimum 1."""
+        import math
+        total = len(self.user_roles.get(room_id, {}))
+        return max(1, math.ceil(total / 2))
+
     def destroy_room(self, room_id: str):
         """Fully destroy a room — stop tick loop, purge all state."""
         self.stop_tick_loop(room_id)
@@ -178,6 +184,7 @@ class RoomService:
 
         votes[connection_id] = now
         count = len(votes)
+        needed = self.get_drop_threshold(room_id)
 
         # Resolve display name for timeline
         display = None
@@ -185,10 +192,10 @@ class RoomService:
             display = self.user_display_names.get(room_id, {}).get(user_id)
         display = display or (user_id[:8] if user_id else "anon")
 
-        self.log_event(room_id, "drop", f"{display} voted drop ({count}/3)")
-        print(f"[Room] DROP vote from {display} (conn={connection_id[:8]}) for {room_id}: {count}/3")
+        self.log_event(room_id, "drop", f"{display} voted drop ({count}/{needed})")
+        print(f"[Room] DROP vote from {display} (conn={connection_id[:8]}) for {room_id}: {count}/{needed}")
 
-        if count >= 3:
+        if count >= needed:
             votes.clear()
             self._drop_window_start[room_id] = None
             self.log_event(room_id, "drop", "🔥 DROP TRIGGERED!")

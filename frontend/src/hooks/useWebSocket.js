@@ -209,5 +209,7 @@ export function useWebSocket() {
     })
   }, [send])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, addListener: (cb) => manager.addListener(cb) }
+  const addListener = useCallback((cb) => manager.addListener(cb), [])
+
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, addListener }
 }
