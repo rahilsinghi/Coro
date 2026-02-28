@@ -74,6 +74,7 @@ class RoomService:
         if room_id not in self.rooms:
             return
         self.rooms[room_id].current_inputs[role.value] = payload
+        print(f"[Room] Input from {role.value}: {payload}")
 
     def update_after_arbitration(self, room_id: str, prompts, bpm: int, density: float, brightness: float):
         """Called by the tick loop after Gemini returns arbitration results."""
@@ -145,8 +146,18 @@ class RoomService:
             if room_id not in self.rooms:
                 break
             room = self.rooms[room_id]
-            if room.is_playing:
-                await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            if not room.is_playing:
+                continue
+
+            # Apply energy controller inputs directly to room state
+            energy_input = room.current_inputs.get("energy", {})
+            if "density" in energy_input:
+                room.density = float(energy_input["density"])
+            if "brightness" in energy_input:
+                room.brightness = float(energy_input["brightness"])
+
+            print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
+            await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
 
 
 # Singleton
