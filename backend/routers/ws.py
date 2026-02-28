@@ -106,6 +106,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 # This catches the "receive once a disconnect message has been received" error
                 break
 
+            # Handle WebSocket disconnect frame
+            if data.get("type") == "websocket.disconnect":
+                print(f"[WS] Disconnect frame received: user={user_id}, room={room_id}")
+                break
+
             if "bytes" in data and data["bytes"]:
                 # Binary from client — not expected but ignore gracefully
                 continue
@@ -122,9 +127,19 @@ async def websocket_endpoint(websocket: WebSocket):
             msg_type = msg.get("type")
             user_id = msg.get("user_id", user_id)
 
+            # On reconnect, restore room_id from the message if we lost it
+            if not room_id and msg.get("room_id"):
+                room_id = msg["room_id"].upper()
+                # Re-register this WebSocket so broadcasts reach this client
+                if room_id in room_service.rooms and user_id:
+                    room_service.connections.setdefault(room_id, set()).add(websocket)
+                    room_service.user_sockets.setdefault(room_id, {})[user_id] = websocket
+                    print(f"[WS] Reconnected user={user_id} to room={room_id}")
+
             # ── CREATE ROOM ──────────────────────────────────────────────────
             if msg_type == "create_room":
-                room = room_service.create_room(host_id=user_id)
+                device_name = msg.get("device_name", "Unknown")
+                room = room_service.create_room(host_id=user_id, device_name=device_name)
                 room_id = room.room_id
                 role = room_service.join_room(room_id, user_id, websocket)
                 join_url = f"?room_id={room_id}"
@@ -134,6 +149,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "join_url": join_url,
                     "role": role.value if role else None,
                 })
+                # Broadcast initial state so host sees participants immediately
+                if room_id in room_service.rooms:
+                    state_msg = room_service.get_state_update_message(room_id)
+                    await room_service.broadcast_json(room_id, state_msg)
 
             # ── JOIN ROOM ────────────────────────────────────────────────────
             elif msg_type == "join_room":
@@ -148,6 +167,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "role": role.value if role else None,
                     "user_id": user_id,
                 })
+                # Broadcast updated participants to all clients in the room
+                if room_id in room_service.rooms:
+                    state_msg = room_service.get_state_update_message(room_id)
+                    await room_service.broadcast_json(room_id, state_msg)
 
             # ── START MUSIC ──────────────────────────────────────────────────
             elif msg_type == "start_music":
@@ -162,10 +185,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "error", "message": "Only host can start music"})
                     continue
 
-                room.is_playing = True
-                await lyria_service.start_session(room_id, initial_bpm=room.bpm)
-                room_service.start_tick_loop(room_id, _arbitration_tick)
-                await room_service.broadcast_json(room_id, {"type": "music_started"})
+                try:
+                    room.is_playing = True
+                    await lyria_service.start_session(room_id, initial_bpm=room.bpm)
+                    room_service.start_tick_loop(room_id, _arbitration_tick)
+                    await room_service.broadcast_json(room_id, {"type": "music_started"})
+                except Exception as e:
+                    room.is_playing = False
+                    print(f"[WS] start_music failed for room {room_id}: {e}")
+                    await websocket.send_json({"type": "error", "message": f"Failed to start music: {str(e)}"})
 
             # ── STOP MUSIC ───────────────────────────────────────────────────
             elif msg_type == "stop_music":

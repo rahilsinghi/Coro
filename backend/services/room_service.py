@@ -11,6 +11,8 @@ from models.schemas import RoomState, WeightedPrompt, Role
 
 
 class RoomService:
+    MAX_USERS_PER_ROOM = 10
+
     def __init__(self):
         # room_id → RoomState
         self.rooms: Dict[str, RoomState] = {}
@@ -18,14 +20,16 @@ class RoomService:
         self.connections: Dict[str, Set[WebSocket]] = {}
         # room_id → user_id → WebSocket
         self.user_sockets: Dict[str, Dict[str, WebSocket]] = {}
-        # room_id -> user_id -> Role
+        # room_id → user_id → Role
         self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
-        # room_id -> asyncio task for tick loop
+        # room_id → host device name (for lobby room listing)
+        self._host_devices: Dict[str, str] = {}
+        # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
 
-    def create_room(self, host_id: str) -> RoomState:
+    def create_room(self, host_id: str, device_name: str = "Unknown") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
         room = RoomState(
             room_id=room_id,
@@ -41,21 +45,47 @@ class RoomService:
         self.connections[room_id] = set()
         self.user_sockets[room_id] = {}
         self.user_roles[room_id] = {}
+        self._host_devices[room_id] = device_name
+        print(f"[Room] Created room {room_id} — host={host_id}, device={device_name}")
         return room
+
+    def get_rooms_list(self) -> list:
+        """Return list of active rooms for the lobby."""
+        rooms_list = []
+        for room_id, room in self.rooms.items():
+            room_roles = self.user_roles.get(room_id, {})
+            rooms_list.append({
+                "room_id": room_id,
+                "member_count": len(room_roles),
+                "is_playing": room.is_playing,
+                "host_device": self._host_devices.get(room_id, "Unknown"),
+                "roles_taken": [role.value for role in room_roles.values()],
+            })
+        return rooms_list
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
         if room_id not in self.rooms:
             return None
 
+        room_roles = self.user_roles.get(room_id, {})
+
+        # Allow reconnecting users through, but cap new joins
+        if user_id not in room_roles and len(room_roles) >= self.MAX_USERS_PER_ROOM:
+            print(f"[Room] Room {room_id} is full ({self.MAX_USERS_PER_ROOM} users) — rejecting {user_id}")
+            return None
+
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
-        # Re-assign if user already has a role in this room
-        if user_id in self.user_roles.get(room_id, {}):
-            return self.user_roles[room_id][user_id]
+        room_roles = self.user_roles.get(room_id, {})
+
+        # If user already has a role in this room (reconnect), reuse it
+        if user_id in room_roles:
+            print(f"[Room] User {user_id} reconnected with existing role {room_roles[user_id].value}")
+            return room_roles[user_id]
 
         # Assign next available role
-        taken_roles = set(self.user_roles.get(room_id, {}).values())
+        taken_roles = set(room_roles.values())
         assigned_role = None
         for role in self._role_queue:
             if role not in taken_roles:
@@ -65,9 +95,8 @@ class RoomService:
         if not assigned_role:
             assigned_role = Role.ENERGY
 
-        if room_id not in self.user_roles:
-            self.user_roles[room_id] = {}
-        self.user_roles[room_id][user_id] = assigned_role
+        self.user_roles.setdefault(room_id, {})[user_id] = assigned_role
+        print(f"[Room] Assigned {assigned_role.value} to user {user_id} in room {room_id}")
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
@@ -76,12 +105,14 @@ class RoomService:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        # We NO LONGER pop user_roles here. Roles persist per room for session stability.
+        # NOTE: Do NOT pop user_roles here — role persists across reconnects
+        # Roles are only cleaned up when the room is destroyed
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
             return
         self.rooms[room_id].current_inputs[role.value] = payload
+        print(f"[Room] Input from {role.value}: {payload}")
 
     def update_after_arbitration(self, room_id: str, prompts, bpm: int, density: float, brightness: float):
         """Called by the tick loop after Gemini returns arbitration results."""
@@ -102,14 +133,17 @@ class RoomService:
 
     def get_state_update_message(self, room_id: str) -> dict:
         room = self.rooms[room_id]
+        room_roles = self.user_roles.get(room_id, {})
+        participants = [{"user_id": uid, "role": role.value} for uid, role in room_roles.items()]
         return {
             "type": "state_update",
-            "active_prompts": [p.dict() for p in room.active_prompts],
+            "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
             "brightness": room.brightness,
             "current_inputs": room.current_inputs,
             "influence_weights": room.influence_weights,
+            "participants": participants,
         }
 
     async def broadcast_json(self, room_id: str, message: dict):
@@ -153,8 +187,20 @@ class RoomService:
             if room_id not in self.rooms:
                 break
             room = self.rooms[room_id]
-            if room.is_playing:
-                await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            if not room.is_playing:
+                continue
+
+            # Apply energy controller inputs directly to room state
+            energy_input = room.current_inputs.get("energy", {})
+            if "density" in energy_input:
+                room.density = float(energy_input["density"])
+            if "brightness" in energy_input:
+                room.brightness = float(energy_input["brightness"])
+
+            print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
+            await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            # Clear consumed inputs so stale ones don't re-trigger Gemini
+            room.current_inputs = {}
 
 
 # Singleton

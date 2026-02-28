@@ -24,6 +24,7 @@ export const useRoomStore = create((set) => ({
   currentInputs: {},
   influenceWeights: {},
   geminiReasoning: '',
+  participants: [],
 
   setEnteredCoro: (val) => {
     sessionStorage.setItem('hasEnteredCoro', val)
@@ -44,6 +45,7 @@ export const useRoomStore = create((set) => ({
       currentInputs: msg.current_inputs || {},
       influenceWeights: msg.influence_weights || {},
       geminiReasoning: msg.gemini_reasoning || '',
+      participants: msg.participants || [],
     }),
 
   reset: () =>
@@ -58,5 +60,6 @@ export const useRoomStore = create((set) => ({
       bpm: 100,
       currentInputs: {},
       influenceWeights: {},
+      participants: [],
     }),
 }))

@@ -3,12 +3,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
+import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 
 export default function Host() {
-  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning } = useRoomStore()
+  const { roomId, userId, isPlaying, activePrompts, influenceWeights, bpm, geminiReasoning, participants } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const [showQR, setShowQR] = useState(true)
@@ -112,6 +113,31 @@ export default function Host() {
               </button>
             </div>
           )}
+
+          {/* Band Members */}
+          <div className="card">
+            <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">
+              Band Members
+            </p>
+            {participants.length === 0 ? (
+              <p className="text-cs-muted text-sm">Waiting for players...</p>
+            ) : (
+              <div className="space-y-2">
+                {participants.map((p) => {
+                  const roleInfo = ROLES[p.role]
+                  return (
+                    <div key={p.user_id} className={`flex items-center gap-3 p-2 rounded-lg ${roleInfo?.bgColor || ''} border ${roleInfo?.borderColor || 'border-cs-border'}`}>
+                      <span className="text-lg">{roleInfo?.emoji || '🎵'}</span>
+                      <div>
+                        <p className={`text-sm font-bold ${roleInfo?.color || 'text-white'}`}>{roleInfo?.label || p.role}</p>
+                        <p className="text-xs text-cs-muted">{roleInfo?.description || ''}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Influence meter */}
           <div className="glass-card p-8 flex-1 flex flex-col">

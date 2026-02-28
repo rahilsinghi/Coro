@@ -65,7 +65,6 @@ class WebSocketManager {
   }
 
   handleMessage(msg) {
-    // Basic logs
     if (msg.type !== 'ping') {
       console.log('[WS] ←', msg.type, msg)
     }
@@ -115,7 +114,7 @@ export function useWebSocket() {
 
   const send = useCallback((message) => manager.send(message), [])
 
-  const createRoom = useCallback((userId) => {
+  const createRoom = useCallback((userId, deviceName = 'Unknown') => {
     return new Promise((resolve) => {
       const cleanup = manager.addListener((msg) => {
         if (msg.type === 'room_created') {
@@ -124,7 +123,7 @@ export function useWebSocket() {
           resolve(msg)
         }
       })
-      send({ type: 'create_room', user_id: userId })
+      send({ type: 'create_room', user_id: userId, device_name: deviceName })
     })
   }, [send, store])
 

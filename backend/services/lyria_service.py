@@ -41,7 +41,7 @@ class LyriaService:
         try:
             session_ctx = self.client.aio.live.music.connect(model="models/lyria-realtime-exp")
             session = await session_ctx.__aenter__()
-            self._sessions[room_id] = {"session": session, "ctx": session_ctx}
+            self._sessions[room_id] = {"session": session, "ctx": session_ctx, "bpm": initial_bpm}
 
             # Set initial config
             await session.set_music_generation_config(
@@ -84,6 +84,9 @@ class LyriaService:
             except Exception as e:
                 print(f"[Lyria] Error stopping session for room {room_id}: {e}")
 
+    # Max BPM change per tick — prevents jarring reset_context() jumps
+    MAX_BPM_DELTA = 10
+
     async def update_prompts(
         self,
         room_id: str,
@@ -95,6 +98,7 @@ class LyriaService:
         """
         Called by the arbitration tick to update Lyria with new prompts.
         This is the key method that makes the music change.
+        BPM is clamped to ±5 per tick for smooth transitions.
         """
         session_data = self._sessions.get(room_id)
         if not session_data:
@@ -103,7 +107,20 @@ class LyriaService:
 
         session = session_data["session"]
         try:
-            # Update music config (BPM, density, brightness)
+            # Store Gemini's desired BPM as the target
+            session_data["target_bpm"] = bpm
+
+            # Clamp actual BPM change to ±MAX_BPM_DELTA per tick
+            last_bpm = session_data.get("bpm", bpm)
+            delta = bpm - last_bpm
+            if abs(delta) > self.MAX_BPM_DELTA:
+                bpm = last_bpm + self.MAX_BPM_DELTA * (1 if delta > 0 else -1)
+
+            # BPM changes require reset_context() per skill.md
+            if bpm != last_bpm:
+                print(f"[Lyria] BPM {last_bpm} → {bpm} (target {session_data['target_bpm']}) for room {room_id} — resetting context")
+                await session.reset_context()
+
             await session.set_music_generation_config(
                 config=types.LiveMusicGenerationConfig(
                     bpm=bpm,
@@ -112,6 +129,7 @@ class LyriaService:
                     temperature=1.0,
                 )
             )
+            session_data["bpm"] = bpm
 
             # Update weighted prompts — this is what makes the music morph
             await session.set_weighted_prompts(prompts=prompts)
@@ -146,6 +164,8 @@ class LyriaService:
             print(f"[Lyria] Receive loop cancelled for room {room_id}")
         except Exception as e:
             print(f"[Lyria] Receive loop error for room {room_id}: {e}")
+            self._sessions.pop(room_id, None)
+            self._receive_tasks.pop(room_id, None)
 
     def is_playing(self, room_id: str) -> bool:
         return room_id in self._sessions
