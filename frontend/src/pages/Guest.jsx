@@ -435,7 +435,7 @@ export default function Guest() {
 
           {/* Influence Meter */}
           <div
-            className="rounded-[2rem] p-6"
+            className="rounded-[2rem] p-6 max-w-md"
             style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
           >
             <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-5 text-[#00D1FF]">

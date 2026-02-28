@@ -26,12 +26,14 @@ function formatInputSummary(inputs) {
 
 export default function Host() {
   const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs } = useRoomStore()
-  const { startMusic, stopMusic, endStream, closeRoom } = useWebSocket()
+  const { send, startMusic, stopMusic, endStream, closeRoom } = useWebSocket()
   const clearRoom = useRoomStore((s) => s.clearRoom)
   const { unlock } = useAudioPlayer()
   const navigate = useNavigate()
   const [showQR, setShowQR] = useState(true)
   const timelineEndRef = useRef(null)
+  const [micEnabled, setMicEnabled] = useState(false)
+  const micStreamRef = useRef(null)
 
   const joinUrl = `${window.location.origin}/?room_id=${roomId}`
 
@@ -39,6 +41,61 @@ export default function Host() {
   useEffect(() => {
     timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [timeline])
+
+  // Cleanup mic on unmount
+  useEffect(() => {
+    return () => {
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop())
+        if (micStreamRef.current._interval) clearInterval(micStreamRef.current._interval)
+      }
+    }
+  }, [])
+
+  const toggleMic = async () => {
+    if (micEnabled) {
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      if (micStreamRef.current?._interval) clearInterval(micStreamRef.current._interval)
+      micStreamRef.current = null
+      setMicEnabled(false)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micStreamRef.current = stream
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const analyser = ctx.createAnalyser()
+      const source = ctx.createMediaStreamSource(stream)
+      source.connect(analyser)
+      analyser.fftSize = 256
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      setMicEnabled(true)
+
+      let smoothedAvg = 0
+      const clapTimestamps = []
+
+      const interval = setInterval(() => {
+        analyser.getByteFrequencyData(data)
+        const instant = data.reduce((a, b) => a + b, 0) / data.length / 255
+        const now = Date.now()
+        if (instant - smoothedAvg > 0.10 && instant > 0.08) {
+          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 120) {
+            clapTimestamps.push(now)
+          }
+        }
+        smoothedAvg = smoothedAvg * 0.85 + instant * 0.15
+        const cutoff = now - 3000
+        while (clapTimestamps.length && clapTimestamps[0] < cutoff) clapTimestamps.shift()
+        const recentClaps = clapTimestamps.filter(t => t > now - 2000).length
+        const clap_rate = Math.min(recentClaps / 4, 1.0)
+        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: instant, clap_rate })
+      }, 200)
+      micStreamRef.current._interval = interval
+    } catch (e) {
+      console.warn('[Mic] Permission denied or unavailable:', e)
+      alert("Microphone access is required for the applause feature.")
+    }
+  }
 
   const handlePlay = () => {
     unlock()
@@ -172,9 +229,9 @@ export default function Host() {
                 </div>
               </div>
 
-              {/* Influence Meter — full width bottom of left col */}
+              {/* Influence Meter */}
               <div
-                className="rounded-[2rem] p-6"
+                className="rounded-[2rem] p-6 max-w-md"
                 style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-5 text-[#00D1FF]">
@@ -248,7 +305,7 @@ export default function Host() {
                     {Math.round(applauseLevel * 100)}%
                   </span>
                 </div>
-                <div className="w-full rounded-full h-3 overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <div className="w-full rounded-full h-3 overflow-hidden mb-4" style={{ background: 'rgba(255,255,255,0.07)' }}>
                   <div
                     className="h-full transition-all duration-300 rounded-full"
                     style={{
@@ -257,6 +314,19 @@ export default function Host() {
                       boxShadow: applauseLevel > 0.6 ? '0 0 12px rgba(239,68,68,0.5)' : 'none',
                     }}
                   />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] text-white/22">Share your mic to energise the room</p>
+                  <button
+                    onClick={toggleMic}
+                    className="px-5 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                    style={micEnabled
+                      ? { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' }
+                      : { background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }
+                    }
+                  >
+                    {micEnabled ? 'Stop Mic' : 'Enable Mic'}
+                  </button>
                 </div>
               </div>
 

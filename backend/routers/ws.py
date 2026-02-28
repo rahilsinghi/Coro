@@ -145,6 +145,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # ── CREATE ROOM ──────────────────────────────────────────────────
             if msg_type == "create_room":
+                # Clean up previous room membership before creating a new one
+                if room_id and user_id:
+                    room_service.remove_connection(room_id, user_id, websocket)
+                    room_id = None
+
                 device_name = msg.get("device_name", "Unknown")
                 room_name = msg.get("room_name", "")
                 display_name = msg.get("display_name", "")
@@ -166,7 +171,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # ── JOIN ROOM ────────────────────────────────────────────────────
             elif msg_type == "join_room":
-                room_id = msg.get("room_id", "").upper()
+                # Clean up previous room membership before joining a new one
+                old_room_id = room_id
+                new_room_id = msg.get("room_id", "").upper()
+                if old_room_id and old_room_id != new_room_id and user_id:
+                    room_service.remove_connection(old_room_id, user_id, websocket)
+                room_id = new_room_id
                 display_name = msg.get("display_name", "")
                 if not room_id or room_id not in room_service.rooms:
                     await websocket.send_json({"type": "error", "message": f"Room {room_id} not found"})

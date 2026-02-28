@@ -445,6 +445,8 @@ export default function BandStage({ participants = [], isPlaying = false, curren
 
 function formatInputBrief(role, inputs) {
     if (!inputs || typeof inputs !== 'object') return ''
+    // Custom prompt takes priority — show what the player typed
+    if (inputs.custom_prompt) return inputs.custom_prompt
     switch (role) {
         case 'drummer': return inputs.bpm ? `${inputs.bpm} BPM` : ''
         case 'vibe_setter': return inputs.mood || ''
