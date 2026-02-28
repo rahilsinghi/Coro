@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    background-color: #000000;
+    background-color: #050814;
     color: #ffffff;
     font-family: Inter, system-ui, sans-serif;
     overflow-x: hidden;
@@ -80,6 +80,90 @@
   .neon-input:focus {
     border-color: #00D1FF;
     box-shadow: 0 0 15px rgba(0, 209, 255, 0.2);
+  }
+}
+
+/* ── Ribbon wave drift animations ─────────────────────────────────────── */
+@keyframes ribbonDrift1 {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+
+  50% {
+    transform: translateX(-12px) translateY(6px);
+  }
+
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes ribbonDrift2 {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+
+  50% {
+    transform: translateX(10px) translateY(-8px);
+  }
+
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes ribbonDrift3 {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+
+  50% {
+    transform: translateX(-8px) translateY(-5px);
+  }
+
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes ribbonDrift4 {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+
+  50% {
+    transform: translateX(6px) translateY(4px);
+  }
+
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+.ribbon-drift-1 {
+  animation: ribbonDrift1 16s ease-in-out infinite;
+}
+
+.ribbon-drift-2 {
+  animation: ribbonDrift2 18s ease-in-out infinite;
+}
+
+.ribbon-drift-3 {
+  animation: ribbonDrift3 14s ease-in-out infinite;
+}
+
+.ribbon-drift-4 {
+  animation: ribbonDrift4 17s ease-in-out infinite;
+}
+
+/* Honor prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+
+  .ribbon-drift-1,
+  .ribbon-drift-2,
+  .ribbon-drift-3,
+  .ribbon-drift-4 {
+    animation: none;
   }
 }
 

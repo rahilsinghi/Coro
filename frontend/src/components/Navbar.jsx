@@ -17,8 +17,13 @@ export default function Navbar() {
     return (
         <nav className="fixed top-0 left-0 right-0 z-[110] flex items-center justify-between px-6 py-4 backdrop-blur-md bg-black/10 border-b border-white/5">
             {/* Wordmark — click returns to landing */}
-            <a href="/" onClick={handleLogoClick} className="group flex items-center gap-2 cursor-pointer">
-                <span className="text-2xl font-black tracking-tighter text-white group-hover:text-[#00D1FF] transition-colors duration-200">
+            <a
+                href="/"
+                onClick={handleLogoClick}
+                className="group flex items-center gap-2 cursor-pointer relative z-[120]"
+                aria-label="Coro Home"
+            >
+                <span className="text-2xl font-black tracking-tighter text-white group-hover:text-[#00D1FF] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(0,209,255,0.6)]">
                     CORO
                 </span>
                 <div className="h-1 w-4 bg-[#00D1FF] shadow-[0_0_10px_#00D1FF] group-hover:w-8 transition-all duration-300" />
