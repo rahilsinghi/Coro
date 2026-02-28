@@ -22,10 +22,12 @@ class RoomService:
         self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
+        # room_id → host device name (for lobby room listing)
+        self._host_devices: Dict[str, str] = {}
         # room_id → asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
 
-    def create_room(self, host_id: str) -> RoomState:
+    def create_room(self, host_id: str, device_name: str = "Unknown") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
         room = RoomState(
             room_id=room_id,
@@ -41,7 +43,23 @@ class RoomService:
         self.connections[room_id] = set()
         self.user_sockets[room_id] = {}
         self.user_roles[room_id] = {}
+        self._host_devices[room_id] = device_name
+        print(f"[Room] Created room {room_id} — host={host_id}, device={device_name}")
         return room
+
+    def get_rooms_list(self) -> list:
+        """Return list of active rooms for the lobby."""
+        rooms_list = []
+        for room_id, room in self.rooms.items():
+            room_roles = self.user_roles.get(room_id, {})
+            rooms_list.append({
+                "room_id": room_id,
+                "member_count": len(room_roles),
+                "is_playing": room.is_playing,
+                "host_device": self._host_devices.get(room_id, "Unknown"),
+                "roles_taken": [role.value for role in room_roles.values()],
+            })
+        return rooms_list
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
         if room_id not in self.rooms:
@@ -105,6 +123,8 @@ class RoomService:
 
     def get_state_update_message(self, room_id: str) -> dict:
         room = self.rooms[room_id]
+        room_roles = self.user_roles.get(room_id, {})
+        participants = [{"user_id": uid, "role": role.value} for uid, role in room_roles.items()]
         return {
             "type": "state_update",
             "active_prompts": [p.dict() for p in room.active_prompts],
@@ -113,6 +133,7 @@ class RoomService:
             "brightness": room.brightness,
             "current_inputs": room.current_inputs,
             "influence_weights": room.influence_weights,
+            "participants": participants,
         }
 
     async def broadcast_json(self, room_id: str, message: dict):

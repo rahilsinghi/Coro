@@ -99,7 +99,7 @@ export function useWebSocket() {
   }, [])
 
   // Actions
-  const createRoom = useCallback((userId) => {
+  const createRoom = useCallback((userId, deviceName = 'Unknown') => {
     return new Promise((resolve) => {
       const ws = wsRef.current
       if (!ws) return
@@ -114,7 +114,7 @@ export function useWebSocket() {
         }
       }
       ws.addEventListener('message', handler)
-      send({ type: 'create_room', user_id: userId })
+      send({ type: 'create_room', user_id: userId, device_name: deviceName })
     })
   }, [send, setRoom])
 

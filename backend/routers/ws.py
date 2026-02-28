@@ -129,7 +129,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # ── CREATE ROOM ──────────────────────────────────────────────────
             if msg_type == "create_room":
-                room = room_service.create_room(host_id=user_id)
+                device_name = msg.get("device_name", "Unknown")
+                room = room_service.create_room(host_id=user_id, device_name=device_name)
                 room_id = room.room_id
                 role = room_service.join_room(room_id, user_id, websocket)
                 join_url = f"?room_id={room_id}"
@@ -139,6 +140,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "join_url": join_url,
                     "role": role.value if role else None,
                 })
+                # Broadcast initial state so host sees participants immediately
+                if room_id in room_service.rooms:
+                    state_msg = room_service.get_state_update_message(room_id)
+                    await room_service.broadcast_json(room_id, state_msg)
 
             # ── JOIN ROOM ────────────────────────────────────────────────────
             elif msg_type == "join_room":
@@ -153,6 +158,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "role": role.value if role else None,
                     "user_id": user_id,
                 })
+                # Broadcast updated participants to all clients in the room
+                if room_id in room_service.rooms:
+                    state_msg = room_service.get_state_update_message(room_id)
+                    await room_service.broadcast_json(room_id, state_msg)
 
             # ── START MUSIC ──────────────────────────────────────────────────
             elif msg_type == "start_music":

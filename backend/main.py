@@ -6,6 +6,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.ws import router as ws_router
+from services.room_service import room_service
 
 app = FastAPI(title="CrowdSynth API", version="1.0.0")
 
@@ -23,3 +24,9 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "crowdsynth-backend"}
+
+
+@app.get("/rooms")
+async def list_rooms():
+    """Return active rooms for the lobby screen."""
+    return {"rooms": room_service.get_rooms_list()}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -19,6 +19,8 @@ export default function Home() {
   const { createRoom, joinRoom } = useWebSocket()
   const isConnected = useRoomStore((s) => s.isConnected)
 
+  const [availableRooms, setAvailableRooms] = useState([])
+
   // Check if joining via QR link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -26,11 +28,67 @@ export default function Home() {
     if (rid) setJoinCode(rid)
   }, [])
 
+  // Auto-join when arriving via a ?room_id= link and WS is ready
+  const autoJoinAttempted = useRef(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const rid = params.get('room_id')
+    if (rid && isConnected && !autoJoinAttempted.current) {
+      autoJoinAttempted.current = true
+      const doAutoJoin = async () => {
+        setLoading(true)
+        try {
+          const result = await joinRoom(rid.toUpperCase(), userId)
+          if (result.error) {
+            setError(result.error)
+          } else {
+            navigate('/guest')
+          }
+        } catch (e) {
+          setError('Failed to auto-join room.')
+        } finally {
+          setLoading(false)
+        }
+      }
+      doAutoJoin()
+    }
+  }, [isConnected, joinRoom, userId, navigate])
+
+  // Fetch available rooms periodically
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const apiBase = (import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws').replace('ws://', 'http://').replace('wss://', 'https://').replace('/ws', '')
+        const res = await fetch(`${apiBase}/rooms`)
+        const data = await res.json()
+        setAvailableRooms(data.rooms || [])
+      } catch (e) {
+        // Silently fail — rooms card is optional
+      }
+    }
+    fetchRooms()
+    const interval = setInterval(fetchRooms, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Parse a friendly device name from user agent
+  const getDeviceName = () => {
+    const ua = navigator.userAgent
+    if (/iPhone/.test(ua)) return 'iPhone'
+    if (/iPad/.test(ua)) return 'iPad'
+    if (/Android/.test(ua)) return 'Android'
+    if (/Mac/.test(ua)) return 'Mac'
+    if (/Windows/.test(ua)) return 'Windows'
+    if (/Linux/.test(ua)) return 'Linux'
+    return 'Device'
+  }
+
   const handleCreate = async () => {
     setLoading(true)
     setError('')
     try {
-      const result = await createRoom(userId)
+      const result = await createRoom(userId, getDeviceName())
       navigate('/host')
     } catch (e) {
       setError('Failed to create room. Check your connection.')
@@ -137,6 +195,50 @@ export default function Home() {
               </p>
             )}
           </div>
+
+          {/* Available Rooms */}
+          {availableRooms.length > 0 && (
+            <div className="mt-2 pt-6 border-t border-cs-border">
+              <p className="text-xs text-cs-muted font-medium uppercase tracking-wider mb-3">Live Rooms</p>
+              <div className="space-y-2">
+                {availableRooms.map((room) => (
+                  <button
+                    key={room.room_id}
+                    onClick={async () => {
+                      setLoading(true)
+                      setError('')
+                      try {
+                        const result = await joinRoom(room.room_id, userId)
+                        if (result.error) {
+                          setError(result.error)
+                        } else {
+                          navigate('/guest')
+                        }
+                      } catch (e) {
+                        setError('Failed to join room.')
+                      } finally {
+                        setLoading(false)
+                      }
+                    }}
+                    disabled={loading}
+                    className="w-full flex items-center justify-between p-3 bg-cs-bg/50 border border-cs-border rounded-xl hover:border-cs-accent/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-lg font-bold text-cs-accent">{room.room_id}</span>
+                      <div>
+                        <p className="text-sm text-white font-medium">
+                          {room.member_count} player{room.member_count !== 1 ? 's' : ''}
+                          {room.is_playing && <span className="ml-2 text-green-400 text-xs">● LIVE</span>}
+                        </p>
+                        <p className="text-xs text-cs-muted">{room.host_device}</p>
+                      </div>
+                    </div>
+                    <span className="text-cs-muted group-hover:text-cs-accent transition-colors text-sm font-bold">JOIN →</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Task B: Quick Actions */}
