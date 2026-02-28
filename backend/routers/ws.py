@@ -97,6 +97,11 @@ async def websocket_endpoint(websocket: WebSocket):
             # Handle both text (JSON) and binary messages
             data = await websocket.receive()
 
+            # Handle WebSocket disconnect frame
+            if data.get("type") == "websocket.disconnect":
+                print(f"[WS] Disconnect frame received: user={user_id}, room={room_id}")
+                break
+
             if "bytes" in data and data["bytes"]:
                 # Binary from client — not expected but ignore gracefully
                 continue
