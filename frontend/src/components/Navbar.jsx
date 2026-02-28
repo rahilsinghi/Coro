@@ -1,21 +1,28 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useRoomStore } from '../store/roomStore'
 import AuthModals from './AuthModals'
 
 export default function Navbar() {
-    const { isAuthed, setAuthed } = useRoomStore()
+    const { isAuthed, setAuthed, setEnteredCoro } = useRoomStore()
     const [modalType, setModalType] = useState(null) // 'login' | 'signup' | null
+    const navigate = useNavigate()
+
+    const handleLogoClick = (e) => {
+        e.preventDefault()
+        setEnteredCoro(false)   // restore hero / landing screen
+        navigate('/')
+    }
 
     return (
         <nav className="fixed top-0 left-0 right-0 z-[110] flex items-center justify-between px-6 py-4 backdrop-blur-md bg-black/10 border-b border-white/5">
-            {/* Wordmark */}
-            <Link to="/" className="group flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tighter text-white">
+            {/* Wordmark — click returns to landing */}
+            <a href="/" onClick={handleLogoClick} className="group flex items-center gap-2 cursor-pointer">
+                <span className="text-2xl font-black tracking-tighter text-white group-hover:text-[#00D1FF] transition-colors duration-200">
                     CORO
                 </span>
                 <div className="h-1 w-4 bg-[#00D1FF] shadow-[0_0_10px_#00D1FF] group-hover:w-8 transition-all duration-300" />
-            </Link>
+            </a>
 
             {/* Auth Actions */}
             <div className="flex items-center gap-6">

@@ -337,18 +337,18 @@ export default function GlobeExperience({ analyser }) {
                                 <div className="w-8 h-px" style={{ background: 'linear-gradient(to left, transparent, rgba(0,209,255,0.5))' }} />
                             </div>
 
-                            {/* ── Task 4B: New two-line tagline ── */}
-                            <h1
-                                className="font-black text-white leading-tight tracking-tight mb-2"
-                                style={{ fontSize: 'clamp(1.55rem, 4vw, 2rem)' }}
-                            >
-                                The room decides<br />the rhythm
-                            </h1>
+                            {/* ── Two-line tagline with clear size hierarchy ── */}
                             <p
-                                className="font-semibold mb-8"
-                                style={{ fontSize: 'clamp(0.85rem, 2vw, 1rem)', color: 'rgba(0,209,255,0.70)', letterSpacing: '0.04em' }}
+                                className="font-semibold text-white leading-tight tracking-tight whitespace-nowrap"
+                                style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1.05rem)' }}
                             >
-                                Music, made by everyone
+                                The Room Decides The Rhythm
+                            </p>
+                            <p
+                                className="font-black text-white leading-tight tracking-tight whitespace-nowrap mb-8"
+                                style={{ fontSize: 'clamp(1.15rem, 3.2vw, 1.55rem)', marginTop: '0.35rem' }}
+                            >
+                                Music, Made By Everyone
                             </p>
 
                             <p className="text-sm font-medium leading-relaxed mb-10"
