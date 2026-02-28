@@ -24,7 +24,7 @@ export default function InstrumentGrid() {
         Pick instruments <span className="text-purple-400">(up to 2)</span>
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {INSTRUMENTS.map((inst) => (
           <button
             key={inst}

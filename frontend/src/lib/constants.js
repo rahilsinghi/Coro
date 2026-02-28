@@ -72,11 +72,3 @@ export const ROLE_COLORS = {
   instrumentalist: '#a855f7',
   energy: '#22c55e',
 }
-
-export const PROMPT_HINTS = {
-  drummer: 'e.g. "fast hi-hats with trap rolls"',
-  vibe_setter: 'e.g. "make it feel like a sunset drive"',
-  genre_dj: 'e.g. "blend afrobeat with lo-fi"',
-  instrumentalist: 'e.g. "add a dreamy harp melody"',
-  energy: 'e.g. "build up slowly then drop"',
-}
