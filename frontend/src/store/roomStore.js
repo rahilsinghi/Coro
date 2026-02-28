@@ -62,20 +62,26 @@ export const useRoomStore = create((set) => ({
   setTimeline: (val) => set({ timeline: val }),
 
   applyStateUpdate: (msg) =>
-    set((state) => ({
-      activePrompts: msg.active_prompts || [],
-      bpm: msg.bpm || 100,
-      density: msg.density || 0.5,
-      brightness: msg.brightness || 0.5,
-      currentInputs: msg.current_inputs || {},
-      influenceWeights: msg.influence_weights || {},
-      geminiReasoning: msg.gemini_reasoning || '',
-      participants: msg.participants || [],
-      timeline: msg.timeline || [],
-      roomName: msg.room_name || '',
-      applauseLevel: msg.applause_level || 0,
-      ...(msg.is_playing !== undefined ? { isPlaying: msg.is_playing } : {}),
-    })),
+    set((state) => {
+      // Sync local role from server participants (source of truth)
+      const me = (msg.participants || []).find((p) => p.user_id === state.userId)
+      const roleSync = me && me.role ? { role: me.role } : {}
+      return {
+        activePrompts: msg.active_prompts || [],
+        bpm: msg.bpm || 100,
+        density: msg.density || 0.5,
+        brightness: msg.brightness || 0.5,
+        currentInputs: msg.current_inputs || {},
+        influenceWeights: msg.influence_weights || {},
+        geminiReasoning: msg.gemini_reasoning || '',
+        participants: msg.participants || [],
+        timeline: msg.timeline || [],
+        roomName: msg.room_name || '',
+        applauseLevel: msg.applause_level || 0,
+        ...(msg.is_playing !== undefined ? { isPlaying: msg.is_playing } : {}),
+        ...roleSync,
+      }
+    }),
 
   clearRoom: () => {
     set({
