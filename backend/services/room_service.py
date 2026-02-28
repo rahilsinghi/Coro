@@ -39,6 +39,8 @@ class RoomService:
         self.user_display_names: Dict[str, Dict[str, str]] = {}
         # room_id → list of timeline events (capped at 50)
         self._timeline: Dict[str, list] = {}
+        # room_id → role → last input timestamp (for recency-based influence)
+        self._input_timestamps: Dict[str, Dict[str, float]] = {}
 
     def create_room(self, host_id: str, device_name: str = "Unknown", room_name: str = "") -> RoomState:
         room_id = str(uuid.uuid4())[:6].upper()
@@ -230,10 +232,32 @@ class RoomService:
         if len(self._timeline[room_id]) > 50:
             self._timeline[room_id] = self._timeline[room_id][-50:]
 
+    def _recalculate_influence(self, room_id: str):
+        """Recency-weighted influence: recent inputs get more weight."""
+        timestamps = self._input_timestamps.get(room_id, {})
+        if not timestamps:
+            return
+        now = time.time()
+        # Decay factor: inputs lose half their weight every 30 seconds
+        raw = {}
+        for role, ts in timestamps.items():
+            age = now - ts
+            raw[role] = max(0.05, 2 ** (-age / 30.0))
+        total = sum(raw.values())
+        if total > 0:
+            self.rooms[room_id].influence_weights = {
+                role: round(w / total, 2) for role, w in raw.items()
+            }
+
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:
             return
         self.rooms[room_id].current_inputs[role.value] = payload
+        # Track input timestamp for recency-based influence
+        if room_id not in self._input_timestamps:
+            self._input_timestamps[room_id] = {}
+        self._input_timestamps[room_id][role.value] = time.time()
+        self._recalculate_influence(room_id)
         # Log notable inputs to the timeline
         summary_parts = []
         for k, v in payload.items():
@@ -256,11 +280,7 @@ class RoomService:
         room.brightness = brightness
 
         # Recalculate influence weights based on input recency
-        # Simple equal weighting for now — C can make this smarter
-        roles_with_input = list(room.current_inputs.keys())
-        if roles_with_input:
-            weight = round(1.0 / len(roles_with_input), 2)
-            room.influence_weights = {role: weight for role in roles_with_input}
+        self._recalculate_influence(room_id)
 
     def get_state_update_message(self, room_id: str) -> dict:
         room = self.rooms[room_id]

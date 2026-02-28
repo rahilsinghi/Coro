@@ -5,9 +5,10 @@ import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 
 const PRESETS = [
-    { label: 'Zero-G', tag: 'Short', emoji: '✨', text: "Anti-gravity club jam — weightless, floating groove, airy pads, shimmering arps, slow-motion risers, elastic bass, lots of space and reverb, soft but punchy drums, 'zero-G' whooshes." },
-    { label: 'Floating', tag: 'Medium', emoji: '🌌', text: "Make it feel like zero gravity in a neon music studio: gliding synth pads, sparkling plucks, dreamy harmonic layers, bass that 'floats' then hits, drums in half-time with crisp hats, huge reverb tails, subtle sci-fi sweeps, build tension slowly then release into a clean drop." },
-    { label: 'Weightless', tag: 'Long', emoji: '🛸', text: "Anti-gravity soundtrack: weightless + cinematic + club. Start with spacious pads and thin shimmering textures, introduce a pulsing bass that feels like it's suspended, drums come in gradually (half-time kick/snare, fast hats, occasional trap rolls), add micro-swells/risers and airy vocal-like synths, keep the mix wide, glossy, and breathable. Energy should 'lift' every 8 bars, then a smooth drop that still feels floating, not aggressive." },
+    { label: 'Drop It', emoji: '💥', text: 'Build tension and hit a massive bass drop' },
+    { label: 'Chill Vibes', emoji: '🌊', text: 'Slow it down, smooth pads, lo-fi chill' },
+    { label: 'Go Hard', emoji: '🔥', text: 'Max energy, heavy drums, fast tempo, hype it up' },
+    { label: 'Switch Up', emoji: '🔀', text: 'Flip the genre, surprise the crowd, try something new' },
 ]
 
 export default function MiniPromptBar() {
@@ -18,9 +19,11 @@ export default function MiniPromptBar() {
     const [isHovered, setIsHovered] = useState(false)
     const [sentPreset, setSentPreset] = useState(null)
 
+    const sendRole = role || 'energy'
+
     const handleSend = () => {
         if (!prompt.trim() || !roomId) return
-        sendInput(userId, roomId, role, { custom_prompt: prompt.trim() })
+        sendInput(userId, roomId, sendRole, { custom_prompt: prompt.trim() })
         setPrompt('')
         setFlash(true)
         setTimeout(() => setFlash(false), 500)
@@ -28,7 +31,7 @@ export default function MiniPromptBar() {
 
     const handlePreset = (preset) => {
         if (!roomId || !isConnected) return
-        sendInput(userId, roomId, role, { custom_prompt: preset.text })
+        sendInput(userId, roomId, sendRole, { custom_prompt: preset.text })
         setSentPreset(preset.label)
         setFlash(true)
         setTimeout(() => { setFlash(false); setSentPreset(null) }, 800)
@@ -43,17 +46,17 @@ export default function MiniPromptBar() {
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="flex gap-2 mb-2 justify-center"
+                className="flex gap-2 mb-2 justify-center flex-wrap"
             >
                 {PRESETS.map((p) => (
                     <button
                         key={p.label}
                         onClick={() => handlePreset(p)}
                         disabled={!isConnected}
-                        className={`group flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-30 ${
+                        className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all active:scale-95 disabled:opacity-30 ${
                             sentPreset === p.label
-                                ? 'bg-[#00D1FF]/20 border-[#00D1FF]/50 scale-105'
-                                : 'bg-black/50 hover:bg-black/70 border-white/8 hover:border-[#00D1FF]/30'
+                                ? 'bg-[#00D1FF]/20 scale-105'
+                                : 'bg-black/50 hover:bg-black/70'
                         }`}
                         style={{
                             backdropFilter: 'blur(20px)',
@@ -62,11 +65,8 @@ export default function MiniPromptBar() {
                                 : '1px solid rgba(255,255,255,0.08)',
                         }}
                     >
-                        <span className="text-base">{p.emoji}</span>
-                        <div className="text-left">
-                            <p className="text-[11px] font-black text-white/80 group-hover:text-white leading-tight">{p.label}</p>
-                            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">{p.tag}</p>
-                        </div>
+                        <span className="text-sm">{p.emoji}</span>
+                        <span className="text-[11px] font-bold text-white/70 group-hover:text-white">{p.label}</span>
                     </button>
                 ))}
             </motion.div>
