@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { getAudioCtx, getNextPlayTime, setNextPlayTime } from './audioPlayerInstance'
+import { getAudioCtx, getNextPlayTime, setNextPlayTime, triggerTransition } from './audioPlayerInstance'
 
 export function useAudioPlayer() {
   const getContext = useCallback(() => {
@@ -19,7 +19,7 @@ export function useAudioPlayer() {
   }, [getContext])
 
   const enqueueAudio = useCallback((arrayBuffer) => {
-    const { ctx, analyser } = getAudioCtx()
+    const { ctx, gainNode } = getAudioCtx()
     if (ctx.state === 'suspended') ctx.resume()
 
     // Lyria sends raw 16-bit signed PCM, stereo, 48kHz
@@ -40,7 +40,8 @@ export function useAudioPlayer() {
 
       const source = ctx.createBufferSource()
       source.buffer = audioBuffer
-      source.connect(analyser)
+      // Route through gainNode for crossfade support
+      source.connect(gainNode)
 
       // Schedule back-to-back — no gaps
       const now = ctx.currentTime
@@ -54,5 +55,10 @@ export function useAudioPlayer() {
     }
   }, [])
 
-  return { enqueueAudio, unlock, getAnalyser }
+  // Trigger audio crossfade transition
+  const fadeTransition = useCallback((fadeOutMs, fadeInMs, holdMs) => {
+    triggerTransition(fadeOutMs, fadeInMs, holdMs)
+  }, [])
+
+  return { enqueueAudio, unlock, getAnalyser, fadeTransition }
 }

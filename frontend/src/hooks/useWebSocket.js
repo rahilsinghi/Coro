@@ -1,6 +1,9 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useRoomStore } from '../store/roomStore'
 import { useAudioPlayer } from './useAudioPlayer'
+import { triggerTransition } from './audioPlayerInstance'
+
+const getStoreState = () => useRoomStore.getState()
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 
@@ -70,9 +73,15 @@ class WebSocketManager {
     }
 
     switch (msg.type) {
-      case 'state_update':
+      case 'state_update': {
+        // Detect significant music changes and trigger audio crossfade
+        const prevBpm = getStoreState().bpm
+        if (prevBpm && msg.bpm && Math.abs(msg.bpm - prevBpm) >= 5) {
+          triggerTransition(250, 400, 80)
+        }
         this.store?.applyStateUpdate(msg)
         break
+      }
       case 'music_started':
         this.store?.setPlaying(true)
         break
@@ -85,6 +94,7 @@ class WebSocketManager {
         break
       case 'stream_recovered':
         console.log('[WS] Stream recovered:', msg.message)
+        triggerTransition(0, 800, 0) // Gentle fade in from silence
         this.store?.setPlaying(true)
         break
       case 'applause_level':
@@ -100,6 +110,8 @@ class WebSocketManager {
       case 'drop_incoming':
       case 'drop_triggered':
         this.store?.setDropProgress(0)
+        // Audio crossfade for the drop — dramatic fade
+        triggerTransition(400, 600, 150)
         // Trigger visual/haptic effects
         document.body.classList.add('drop-flash')
         navigator.vibrate?.([200, 100, 200])
