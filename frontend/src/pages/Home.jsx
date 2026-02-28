@@ -62,7 +62,7 @@ export default function Home() {
       <div className="text-center mb-12">
         <div className="text-5xl mb-4">🎵</div>
         <h1 className="text-5xl font-extrabold text-white mb-3">
-          Crowd<span className="text-cs-accent">Synth</span>
+          Co<span className="text-cs-accent">ro</span>
         </h1>
         <p className="text-cs-muted text-lg max-w-sm mx-auto">
           The crowd <em className="text-cs-text not-italic font-semibold">is</em> the music.
