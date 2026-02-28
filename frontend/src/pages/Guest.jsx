@@ -210,10 +210,37 @@ export default function Guest() {
       analyser.fftSize = 256
       const data = new Uint8Array(analyser.frequencyBinCount)
       setMicEnabled(true)
+
+      // Clap detection state
+      let smoothedAvg = 0       // slow-moving baseline to detect spikes against
+      const clapTimestamps = [] // ring buffer of recent clap event times
+
       const interval = setInterval(() => {
         analyser.getByteFrequencyData(data)
-        const avg = data.reduce((a, b) => a + b, 0) / data.length / 255
-        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: avg })
+        const instant = data.reduce((a, b) => a + b, 0) / data.length / 255
+
+        // Transient detection: a clap is a sudden spike above the smoothed baseline.
+        // Threshold: rise of >0.10 AND absolute level >0.08 (filters background hiss)
+        const now = Date.now()
+        if (instant - smoothedAvg > 0.10 && instant > 0.08) {
+          // Debounce: ignore if another clap was detected in the last 120 ms
+          if (!clapTimestamps.length || now - clapTimestamps[clapTimestamps.length - 1] > 120) {
+            clapTimestamps.push(now)
+          }
+        }
+
+        // Decay smoothed baseline slowly so it tracks room noise level
+        smoothedAvg = smoothedAvg * 0.85 + instant * 0.15
+
+        // Expire clap timestamps older than 3 s
+        const cutoff = now - 3000
+        while (clapTimestamps.length && clapTimestamps[0] < cutoff) clapTimestamps.shift()
+
+        // Clap rate: claps detected in the last 2 s, normalised 0-1 (4 claps/2 s = max)
+        const recentClaps = clapTimestamps.filter(t => t > now - 2000).length
+        const clap_rate = Math.min(recentClaps / 4, 1.0)
+
+        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: instant, clap_rate })
       }, 200)
       micStreamRef.current._interval = interval
     } catch (e) {

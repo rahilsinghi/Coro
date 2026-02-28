@@ -261,57 +261,93 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "applause_update":
                 if not room_id:
                     continue
+                import math as _math
                 raw_volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
+                clap_rate  = max(0.0, min(1.0, float(msg.get("clap_rate", 0.0))))
                 room = room_service.rooms.get(room_id)
                 if room:
-                    # sqrt curve: amplifies soft sounds so even quiet claps are noticeable
-                    # e.g. 0.1 raw → 0.32 scaled, 0.5 raw → 0.71 scaled, 1.0 → 1.0
-                    import math
-                    scaled = round(math.sqrt(raw_volume), 3)
+                    # sqrt curve amplifies soft sounds (0.1 → 0.32, 0.5 → 0.71, 1.0 → 1.0)
+                    vol_signal = _math.sqrt(raw_volume)
 
-                    # Loud applause (scaled >= 0.7) doubles current density, capped at 1.0
-                    # Soft claps still push density meaningfully via 60% mic weight
-                    if scaled >= 0.7:
-                        new_density = round(min(room.density * 2.0, 1.0), 2)
-                        new_brightness = round(min(room.brightness * 1.5, 1.0), 2)
+                    # Combined intensity: both dimensions are equally weighted.
+                    # Loud + fast = high intensity. Soft + slow = low intensity.
+                    intensity = round((vol_signal * 0.5 + clap_rate * 0.5), 3)
+
+                    # ── Zone thresholds ──────────────────────────────────────
+                    # HIGH  (intensity > 0.55): crowd is energised — amplify music
+                    # LOW   (intensity < 0.25): crowd is quiet/slow — calm music down
+                    # MID   (0.25–0.55): gentle nudge toward intensity
+
+                    if intensity > 0.55:
+                        # Step density and brightness UP noticeably every tick (200 ms)
+                        new_density    = round(min(room.density    + 0.10 + intensity * 0.10, 1.0), 2)
+                        new_brightness = round(min(room.brightness + 0.06 + intensity * 0.06, 1.0), 2)
+                        zone = "HIGH"
+                    elif intensity < 0.25:
+                        # Step density and brightness DOWN — music calms
+                        new_density    = round(max(room.density    - 0.07, 0.05), 2)
+                        new_brightness = round(max(room.brightness - 0.04, 0.05), 2)
+                        zone = "LOW"
                     else:
-                        new_density = round(min(room.density * 0.4 + scaled * 0.6, 1.0), 2)
-                        new_brightness = room.brightness
+                        # Gentle blend toward intensity level
+                        new_density    = round(room.density    * 0.85 + intensity * 0.15, 2)
+                        new_brightness = round(room.brightness * 0.90 + intensity * 0.10, 2)
+                        zone = "MID"
 
-                    # Write back so the next Gemini tick sees the updated state
-                    room.density = new_density
+                    room.density    = new_density
                     room.brightness = new_brightness
                     room.current_inputs["crowd_energy"] = {
                         "applause_volume": round(raw_volume, 2),
-                        "scaled_volume": scaled,
-                        "density": new_density,
-                        "brightness": new_brightness,
+                        "clap_rate":       round(clap_rate, 2),
+                        "intensity":       intensity,
+                        "zone":            zone,
+                        "density":         new_density,
+                        "brightness":      new_brightness,
                     }
 
-                    # Push the change to Lyria immediately (don't wait 4 s for the tick)
+                    # Immediate Lyria push with zone-specific prompts so the music
+                    # CHARACTER changes, not just density/brightness numbers
                     if room.is_playing:
                         session_data = lyria_service._sessions.get(room_id)
                         if session_data:
-                            current_prompts = session_data.get("last_prompts")
-                            if current_prompts:
-                                await lyria_service.update_prompts(
-                                    room_id=room_id,
-                                    prompts=current_prompts,
-                                    bpm=session_data.get("bpm", room.bpm),
-                                    density=new_density,
-                                    brightness=new_brightness,
-                                )
+                            base = session_data.get("last_prompts") or [
+                                genai_types.WeightedPrompt(text="ambient electronic music", weight=1.0)
+                            ]
+                            if zone == "HIGH":
+                                overlay = [genai_types.WeightedPrompt(
+                                    text="energetic crowd energy, intense build-up, driving beat, amplified bass, maximum energy, euphoric",
+                                    weight=round(min(intensity * 1.1, 1.0), 2)
+                                )]
+                            elif zone == "LOW":
+                                overlay = [genai_types.WeightedPrompt(
+                                    text="calm ambient fade, gentle reduction, soft texture, peaceful, quiet, minimal",
+                                    weight=round(max(1.0 - intensity * 1.5, 0.4), 2)
+                                )]
+                            else:
+                                overlay = []
+
+                            lyria_prompts = (overlay + base[:1]) if overlay else base
+                            await lyria_service.update_prompts(
+                                room_id=room_id,
+                                prompts=lyria_prompts,
+                                bpm=session_data.get("bpm", room.bpm),
+                                density=new_density,
+                                brightness=new_brightness,
+                            )
 
                     print(
-                        f"[WS] Applause room={room_id} raw={raw_volume:.2f} "
-                        f"scaled={scaled:.2f} density={new_density:.2f} brightness={new_brightness:.2f}"
+                        f"[WS] Applause [{zone}] room={room_id} vol={raw_volume:.2f} "
+                        f"rate={clap_rate:.2f} intensity={intensity:.2f} "
+                        f"density={new_density:.2f} brightness={new_brightness:.2f}"
                     )
                     await room_service.broadcast_json(room_id, {
-                        "type": "applause_level",
-                        "volume": round(raw_volume, 2),
-                        "scaled_volume": scaled,
-                        "density": new_density,
-                        "loud": scaled >= 0.7,
+                        "type":         "applause_level",
+                        "volume":       round(raw_volume, 2),
+                        "clap_rate":    round(clap_rate, 2),
+                        "intensity":    intensity,
+                        "density":      new_density,
+                        "zone":         zone,
+                        "loud":         zone == "HIGH",
                     })
 
             # ── DROP ────────────────────────────────────────────────────────
