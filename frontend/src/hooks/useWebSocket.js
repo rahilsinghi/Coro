@@ -100,6 +100,8 @@ class WebSocketManager {
         break
       case 'drop_progress':
       case 'drop_triggered':
+      case 'drop_reset':
+      case 'drop_already_voted':
         // Forwarded to per-component listeners via onMessageCallbacks
         break
       case 'error':

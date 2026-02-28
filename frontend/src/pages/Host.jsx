@@ -9,6 +9,7 @@ import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 import Timeline from '../components/Timeline.jsx'
 import SessionControls from '../components/SessionControls.jsx'
+import DropButton from '../components/DropButton.jsx'
 
 function formatInputSummary(inputs) {
   if (!inputs || typeof inputs !== 'object') return ''
@@ -215,6 +216,19 @@ export default function Host() {
                   />
                 </div>
               </div>
+
+              {/* Drop Button */}
+              {isPlaying && (
+                <div
+                  className="rounded-[2rem] p-6"
+                  style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(220,38,38,0.20)' }}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4 text-red-400">
+                    Crowd Drop
+                  </p>
+                  <DropButton userId={userId} roomId={roomId} />
+                </div>
+              )}
 
               {/* QR Code */}
               {showQR && (
