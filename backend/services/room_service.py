@@ -20,7 +20,7 @@ class RoomService:
         self.connections: Dict[str, Set[WebSocket]] = {}
         # room_id → user_id → WebSocket
         self.user_sockets: Dict[str, Dict[str, WebSocket]] = {}
-        # room_id → user_id → role
+        # room_id → user_id → Role
         self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
@@ -100,6 +100,7 @@ class RoomService:
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
+        """Remove explicit socket connection, but persist the role for transient disconnects."""
         if room_id in self.connections:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:

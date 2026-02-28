@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useRoomStore } from '../store/roomStore'
-import QuickActions from '../components/QuickActions'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -18,6 +17,7 @@ export default function Home() {
 
   const { createRoom, joinRoom } = useWebSocket()
   const isConnected = useRoomStore((s) => s.isConnected)
+  const hasEnteredCoro = useRoomStore((s) => s.hasEnteredCoro)
 
   const [availableRooms, setAvailableRooms] = useState([])
 
@@ -88,10 +88,10 @@ export default function Home() {
     setLoading(true)
     setError('')
     try {
-      const result = await createRoom(userId, getDeviceName())
+      await createRoom(userId, getDeviceName())
       navigate('/host')
     } catch (e) {
-      setError('Failed to create room. Check your connection.')
+      setError('Failed to create room.')
     } finally {
       setLoading(false)
     }
@@ -115,84 +115,69 @@ export default function Home() {
     }
   }
 
-  const hasEnteredCoro = useRoomStore((s) => s.hasEnteredCoro)
-
   return (
-    <div className="min-h-screen bg-cs-bg flex flex-col items-center justify-center py-20 px-4 sm:px-6 lg:px-8">
-      <div className={`w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col items-center transition-all duration-1000 ${hasEnteredCoro ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="text-6xl mb-4 animate-bounce">🎵</div>
-          <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-4 tracking-tight">
-            CORO<span className="text-cs-accent drop-shadow-[0_0_15px_rgba(0,195,255,0.5)]"></span>
-          </h1>
-          <p className="text-cs-muted text-xl max-w-2xl mx-auto leading-relaxed">
-            CORO <em className="text-cs-text not-italic font-semibold border-b-2 border-cs-accent/30">is</em> the music.
-            Everyone plays. No skills required.
-          </p>
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className="w-full max-w-4xl flex flex-col items-center">
+        {/* Connection Indicator */}
+        <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-2 rounded-full mb-12 backdrop-blur-md">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#00D1FF] shadow-[0_0_10px_#00D1FF]' : 'bg-yellow-400 animate-pulse'}`} />
+          <span className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-black">
+            {isConnected ? 'Studio Network Online' : 'Connecting to Network...'}
+          </span>
         </div>
 
-        {/* Connection indicator */}
-        <div className="flex items-center gap-2.5 text-sm mb-12 bg-cs-surface/50 px-4 py-2 rounded-full border border-cs-border">
-          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-400 shadow-[0_0_8px_#4ade80]' : 'bg-yellow-400 animate-pulse'}`} />
-          <span className="text-cs-muted font-medium">{isConnected ? 'Connected to Network' : 'Connecting to Network...'}</span>
-        </div>
-
-        {/* Main Panel */}
-        <div className="w-full max-w-2xl bg-cs-surface/30 backdrop-blur-xl border border-cs-border p-8 md:p-12 rounded-3xl shadow-2xl space-y-8">
-          {/* Create room */}
-          <button
-            onClick={handleCreate}
-            disabled={!isConnected || loading}
-            className="btn-primary w-full text-xl py-5 shadow-lg shadow-cs-accent/30 hover:shadow-cs-accent/50 disabled:opacity-50 disabled:cursor-not-allowed group transition-all"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Creating...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                <span className="group-hover:scale-110 transition-transform">🎤</span> Host a Global Room
-              </span>
-            )}
-          </button>
-
-          <div className="flex items-center gap-4 text-cs-muted text-sm px-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-cs-border to-transparent" />
-            <span className="uppercase tracking-widest font-semibold opacity-60 text-xs">or join existing</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-cs-border via-cs-border to-transparent" />
+        {/* Dashboard Card */}
+        <div className="w-full max-w-xl glass-card p-10 md:p-14 space-y-10">
+          <div className="text-center space-y-4">
+            <h1 className="text-5xl font-black text-white tracking-tighter">
+              Coro <span className="text-[#00D1FF]">Studio</span>
+            </h1>
+            <p className="text-white/50 font-medium">Create a new session or join an existing session.</p>
           </div>
 
-          {/* Join room */}
           <div className="space-y-4">
+            <button
+              onClick={handleCreate}
+              disabled={!isConnected || loading}
+              className="btn-primary w-full text-lg py-5 group"
+            >
+              {loading ? 'Initializing...' : 'Host New Session'}
+            </button>
+
+            <div className="flex items-center gap-4 text-white/10">
+              <div className="flex-1 h-px bg-current" />
+              <span className="text-[10px] uppercase tracking-[0.3em] font-black">OR join by code</span>
+              <div className="flex-1 h-px bg-current" />
+            </div>
+
             <div className="flex gap-3">
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                placeholder="ENTER ROOM CODE"
+                placeholder="EX: ABCDEF"
                 maxLength={6}
-                className="flex-1 bg-cs-bg/50 border border-cs-border rounded-2xl px-6 py-4 text-white placeholder-cs-muted/50 font-mono tracking-[0.2em] text-xl focus:outline-none focus:border-cs-accent focus:ring-1 focus:ring-cs-accent transition-all"
+                className="neon-input flex-1 font-mono tracking-widest text-center uppercase"
               />
               <button
                 onClick={handleJoin}
                 disabled={!joinCode.trim() || !isConnected || loading}
-                className="btn-secondary px-8 text-lg font-bold disabled:opacity-50 hover:bg-cs-surface"
+                className="btn-secondary px-8 font-black"
               >
-                JOIN
+                Join
               </button>
             </div>
 
             {error && (
-              <p className="text-red-400 text-sm md:text-base font-medium flex items-center justify-center gap-2">
-                <span className="w-1 h-1 bg-red-400 rounded-full animate-ping" />
-                {error}
-              </p>
+              <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black justify-center
+                ${error.toLowerCase().includes('full')
+                  ? 'bg-yellow-400/10 border border-yellow-400/30 text-yellow-400'
+                  : 'bg-red-400/10 border border-red-400/20 text-red-400 animate-pulse'
+                }`}
+              >
+                {error.toLowerCase().includes('full') ? '🚫' : '⚠️'} {error}
+              </div>
             )}
           </div>
 
@@ -241,14 +226,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* Task B: Quick Actions */}
-        <QuickActions />
-
-        {/* Footer */}
-        <p className="mt-20 mb-12 text-cs-muted text-sm font-medium tracking-wide flex items-center gap-3">
-          <span className="w-8 h-px bg-cs-border" />
-          Powered by Google Lyria + Gemini 2.5
-          <span className="w-8 h-px bg-cs-border" />
+        <p className="mt-16 text-white/20 text-[10px] uppercase tracking-[0.4em] font-black">
+          Powered by Gemini 2.5 + Google Lyria
         </p>
       </div>
     </div>

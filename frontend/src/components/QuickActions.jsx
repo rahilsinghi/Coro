@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MessageSquare, HelpCircle, Play, PlusCircle, Settings, FileText, X, Send } from 'lucide-react'
+import { MessageSquare, HelpCircle, Play, Settings, FileText, X, Send } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export function ChatAIDrawer({ isOpen, onClose }) {
@@ -43,7 +43,7 @@ export function ChatAIDrawer({ isOpen, onClose }) {
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex justify-end">
+                <div className="fixed inset-0 z-[150] flex justify-end">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -56,26 +56,26 @@ export function ChatAIDrawer({ isOpen, onClose }) {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="relative w-full max-w-md bg-cs-surface border-l border-cs-border h-full flex flex-col shadow-2xl"
+                        className="relative w-full max-w-md bg-[#000816]/90 backdrop-blur-2xl border-l border-white/10 h-full flex flex-col shadow-2xl"
                     >
-                        <div className="p-6 border-b border-cs-border flex justify-between items-center bg-cs-bg/50">
+                        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
                             <div>
-                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <MessageSquare className="text-cs-accent" /> Chat AI
+                                <h2 className="text-xl font-black text-white flex items-center gap-3">
+                                    <MessageSquare className="text-[#00D1FF]" /> Chat AI
                                 </h2>
-                                <p className="text-xs text-cs-muted mt-1">Ask CORO for help choosing roles, vibe, and prompts.</p>
+                                <p className="text-[10px] text-white/40 uppercase tracking-widest mt-1 font-bold">Studio Assistant</p>
                             </div>
-                            <button onClick={onClose} className="p-2 hover:bg-cs-border rounded-full transition-colors">
-                                <X size={20} />
+                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40">
+                                <X size={24} />
                             </button>
                         </div>
 
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6">
                             {messages.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] p-4 rounded-2xl ${m.role === 'user'
-                                        ? 'bg-cs-accent text-white rounded-tr-none'
-                                        : 'bg-cs-bg border border-cs-border text-cs-text rounded-tl-none'
+                                    <div className={`max-w-[85%] p-5 rounded-[1.5rem] ${m.role === 'user'
+                                        ? 'bg-[#00D1FF] text-black font-bold rounded-tr-none'
+                                        : 'bg-white/5 border border-white/10 text-white rounded-tl-none font-medium'
                                         }`}>
                                         <p className="text-sm leading-relaxed">{m.content}</p>
                                     </div>
@@ -83,17 +83,17 @@ export function ChatAIDrawer({ isOpen, onClose }) {
                             ))}
                         </div>
 
-                        <form onSubmit={handleSend} className="p-6 border-t border-cs-border bg-cs-bg/50">
-                            <div className="flex gap-2">
+                        <form onSubmit={handleSend} className="p-8 border-t border-white/5 bg-white/5">
+                            <div className="flex gap-3">
                                 <input
                                     autoFocus
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder="Type a message..."
-                                    className="flex-1 bg-cs-surface border border-cs-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cs-accent transition-all"
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[#00D1FF] transition-all text-white placeholder-white/20"
                                 />
-                                <button type="submit" className="p-3 bg-cs-accent hover:bg-purple-500 rounded-xl transition-colors shadow-lg shadow-cs-accent/20">
-                                    <Send size={18} />
+                                <button type="submit" className="p-4 bg-[#00D1FF] hover:bg-[#00E5FF] text-black rounded-2xl transition-all shadow-lg shadow-[#00D1FF]/20 active:scale-95">
+                                    <Send size={20} />
                                 </button>
                             </div>
                         </form>
@@ -108,28 +108,31 @@ export default function QuickActions() {
     const [chatOpen, setChatOpen] = useState(false)
 
     const actions = [
-        { id: 'chat', label: 'Chat AI', icon: MessageSquare, color: 'text-cs-accent', desc: 'Get setup help', onClick: () => setChatOpen(true) },
-        { id: 'how', label: 'How it works', icon: HelpCircle, color: 'text-blue-400', desc: 'View tutorial' },
-        { id: 'demo', label: 'Demo Room', icon: Play, color: 'text-green-400', desc: 'Try it solo' },
-        { id: 'settings', label: 'Settings', icon: Settings, color: 'text-cs-muted', desc: 'Audio & Profile' },
-        { id: 'faq', label: 'FAQ', icon: FileText, color: 'text-amber-400', desc: 'Common questions' },
+        { id: 'chat', label: 'Chat AI', icon: MessageSquare, accent: '#00D1FF', desc: 'Setup help', onClick: () => setChatOpen(true) },
+        { id: 'how', label: 'Tutorial', icon: HelpCircle, accent: '#2D6BFF', desc: 'How it works' },
+        { id: 'demo', label: 'Demo', icon: Play, accent: '#00D1FF', desc: 'Try it solo' },
+        { id: 'settings', label: 'Nodes', icon: Settings, accent: '#7C3AED', desc: 'Audio settings' },
+        { id: 'faq', label: 'FAQ', icon: FileText, accent: '#2D6BFF', desc: 'Help center' },
     ]
 
     return (
-        <div className="w-full mt-12">
-            <h3 className="text-cs-muted uppercase tracking-[0.2em] text-xs font-bold mb-6 text-center">Quick Actions</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="w-full mt-16 max-w-5xl">
+            <h3 className="text-white/20 uppercase tracking-[0.4em] text-[10px] font-black mb-8 text-center">Studio Quick Access</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 {actions.map((action) => (
                     <button
                         key={action.id}
                         onClick={action.onClick}
-                        className="group flex flex-col items-center p-6 bg-cs-surface/40 border border-cs-border rounded-2xl hover:border-cs-accent/50 hover:bg-cs-surface/60 transition-all active:scale-[0.98]"
+                        className="group flex flex-col items-center p-8 bg-white/5 border border-white/10 rounded-[2.5rem] hover:border-[#00D1FF]/40 hover:bg-white/[0.08] transition-all duration-500 active:scale-[0.96] shadow-xl"
                     >
-                        <div className={`p-3 rounded-xl bg-cs-bg group-hover:bg-cs-bg/50 transition-colors mb-3 ${action.color}`}>
-                            <action.icon size={24} />
+                        <div
+                            className="p-4 rounded-[1.5rem] bg-black/40 group-hover:scale-110 transition-transform duration-500 mb-4 shadow-inner"
+                            style={{ color: action.accent }}
+                        >
+                            <action.icon size={28} />
                         </div>
-                        <span className="text-sm font-bold text-white mb-1">{action.label}</span>
-                        <span className="text-[10px] text-cs-muted uppercase tracking-wider">{action.desc}</span>
+                        <span className="text-xs font-black text-white mb-1 uppercase tracking-widest">{action.label}</span>
+                        <span className="text-[9px] text-white/30 uppercase tracking-widest font-bold">{action.desc}</span>
                     </button>
                 ))}
             </div>
