@@ -7,6 +7,7 @@ import { useRoomStore } from '../store/roomStore'
 export default function Home() {
   const navigate = useNavigate()
   const [joinCode, setJoinCode] = useState('')
+  const [sessionName, setSessionName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [userId] = useState(() => localStorage.getItem('cs_user_id') || (() => {
@@ -18,6 +19,7 @@ export default function Home() {
   const { createRoom, joinRoom } = useWebSocket()
   const isConnected = useRoomStore((s) => s.isConnected)
   const hasEnteredCoro = useRoomStore((s) => s.hasEnteredCoro)
+  const displayName = useRoomStore((s) => s.displayName)
 
   const [availableRooms, setAvailableRooms] = useState([])
 
@@ -39,7 +41,7 @@ export default function Home() {
       const doAutoJoin = async () => {
         setLoading(true)
         try {
-          const result = await joinRoom(rid.toUpperCase(), userId)
+          const result = await joinRoom(rid.toUpperCase(), userId, { displayName })
           if (result.error) {
             setError(result.error)
           } else {
@@ -53,7 +55,7 @@ export default function Home() {
       }
       doAutoJoin()
     }
-  }, [isConnected, joinRoom, userId, navigate])
+  }, [isConnected, joinRoom, userId, navigate, displayName])
 
   // Fetch available rooms periodically
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function Home() {
     setLoading(true)
     setError('')
     try {
-      await createRoom(userId, getDeviceName())
+      await createRoom(userId, getDeviceName(), { roomName: sessionName.trim(), displayName })
       navigate('/host')
     } catch (e) {
       setError('Failed to create room.')
@@ -102,7 +104,7 @@ export default function Home() {
     setLoading(true)
     setError('')
     try {
-      const result = await joinRoom(joinCode.trim().toUpperCase(), userId)
+      const result = await joinRoom(joinCode.trim().toUpperCase(), userId, { displayName })
       if (result.error) {
         setError(result.error)
       } else {
@@ -116,7 +118,7 @@ export default function Home() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 pt-32 transition-all duration-1000 pointer-events-auto ${hasEnteredCoro ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="w-full max-w-4xl flex flex-col items-center">
         {/* Connection Indicator */}
         <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-2 rounded-full mb-12 backdrop-blur-md">
@@ -136,6 +138,16 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
+            {/* Session name input */}
+            <input
+              type="text"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value)}
+              placeholder="Session name (optional)"
+              maxLength={40}
+              className="neon-input w-full text-center"
+            />
+
             <button
               onClick={handleCreate}
               disabled={!isConnected || loading}
@@ -176,7 +188,7 @@ export default function Home() {
                   : 'bg-red-400/10 border border-red-400/20 text-red-400 animate-pulse'
                 }`}
               >
-                {error.toLowerCase().includes('full') ? '🚫' : '⚠️'} {error}
+                {error.toLowerCase().includes('full') ? '' : ''} {error}
               </div>
             )}
           </div>
@@ -193,7 +205,7 @@ export default function Home() {
                       setLoading(true)
                       setError('')
                       try {
-                        const result = await joinRoom(room.room_id, userId)
+                        const result = await joinRoom(room.room_id, userId, { displayName })
                         if (result.error) {
                           setError(result.error)
                         } else {
@@ -212,13 +224,15 @@ export default function Home() {
                       <span className="font-mono text-lg font-bold text-cs-accent">{room.room_id}</span>
                       <div>
                         <p className="text-sm text-white font-medium">
-                          {room.member_count} player{room.member_count !== 1 ? 's' : ''}
-                          {room.is_playing && <span className="ml-2 text-green-400 text-xs">● LIVE</span>}
+                          {room.room_name || 'Unnamed Session'}
+                          {room.is_playing && <span className="ml-2 text-green-400 text-xs">LIVE</span>}
                         </p>
-                        <p className="text-xs text-cs-muted">{room.host_device}</p>
+                        <p className="text-xs text-cs-muted">
+                          {room.member_count} player{room.member_count !== 1 ? 's' : ''} &middot; {room.host_device}
+                        </p>
                       </div>
                     </div>
-                    <span className="text-cs-muted group-hover:text-cs-accent transition-colors text-sm font-bold">JOIN →</span>
+                    <span className="text-cs-muted group-hover:text-cs-accent transition-colors text-sm font-bold">JOIN</span>
                   </button>
                 ))}
               </div>

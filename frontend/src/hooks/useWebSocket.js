@@ -38,8 +38,9 @@ class WebSocketManager {
       // Auto-rejoin room if we have a persisted session (e.g. page refresh)
       const saved = JSON.parse(sessionStorage.getItem('cs_room') || 'null')
       if (saved?.roomId && saved?.userId) {
-        console.log('[WS] Rejoining room', saved.roomId, 'as', saved.userId)
-        this.send({ type: 'join_room', room_id: saved.roomId, user_id: saved.userId })
+        const displayName = localStorage.getItem('cs_display_name') || ''
+        console.log('[WS] Rejoining room', saved.roomId, 'as', saved.userId, displayName)
+        this.send({ type: 'join_room', room_id: saved.roomId, user_id: saved.userId, display_name: displayName })
       }
     }
 
@@ -86,6 +87,9 @@ class WebSocketManager {
       case 'music_stopped':
         this.store?.setPlaying(false)
         break
+      case 'applause_level':
+        this.store?.setApplauseLevel(msg.volume ?? 0)
+        break
       case 'drop_progress':
         this.store?.setDropProgress(msg.count)
         break
@@ -131,20 +135,20 @@ export function useWebSocket() {
 
   const send = useCallback((message) => manager.send(message), [])
 
-  const createRoom = useCallback((userId, deviceName = 'Unknown') => {
+  const createRoom = useCallback((userId, deviceName = 'Unknown', { roomName = '', displayName = '' } = {}) => {
     return new Promise((resolve) => {
       const cleanup = manager.addListener((msg) => {
         if (msg.type === 'room_created') {
           cleanup()
-          store.setRoom(msg.room_id, userId, msg.role, true)
+          store.setRoom(msg.room_id, userId, msg.role, true, msg.room_name || roomName)
           resolve(msg)
         }
       })
-      send({ type: 'create_room', user_id: userId, device_name: deviceName })
+      send({ type: 'create_room', user_id: userId, device_name: deviceName, room_name: roomName, display_name: displayName })
     })
   }, [send, store])
 
-  const joinRoom = useCallback((roomId, userId) => {
+  const joinRoom = useCallback((roomId, userId, { displayName = '' } = {}) => {
     return new Promise((resolve) => {
       const cleanup = manager.addListener((msg) => {
         if (msg.type === 'joined') {
@@ -157,7 +161,7 @@ export function useWebSocket() {
           resolve({ error: msg.message })
         }
       })
-      send({ type: 'join_room', room_id: roomId.toUpperCase(), user_id: userId })
+      send({ type: 'join_room', room_id: roomId.toUpperCase(), user_id: userId, display_name: displayName })
     })
   }, [send, store])
 
@@ -179,5 +183,5 @@ export function useWebSocket() {
     })
   }, [send])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput, addListener: (cb) => manager.addListener(cb) }
 }

@@ -147,6 +147,10 @@ class GeminiService:
 
                 self._last_results[room_id] = result
                 print(f"[Gemini] Room {room_id} → {result.reasoning}")
+                # Log Gemini reasoning to the room timeline
+                if result.reasoning:
+                    from services.room_service import room_service as _rs
+                    _rs.log_event(room_id, "gemini", result.reasoning)
                 return result
 
             except json.JSONDecodeError as e:
