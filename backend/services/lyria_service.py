@@ -138,11 +138,21 @@ class LyriaService:
 
         except Exception as e:
             print(f"[Lyria] Failed to update prompts for room {room_id}: {e}")
+            # If session is gone (e.g. connection dropped), remove it so restart can kick in
+            if room_id in self._sessions:
+                session_data_check = self._sessions[room_id]
+                # Check if session is still usable by testing a harmless operation
+                try:
+                    _ = session_data_check["session"]
+                except Exception:
+                    self._sessions.pop(room_id, None)
+            raise  # Let tick loop handle the error
 
     async def _receive_audio_loop(self, room_id: str, session):
         """
         Continuously receives audio chunks from Lyria and broadcasts to room clients.
         Runs as a background task for the lifetime of the session.
+        On error, attempts to restart the session up to 3 times.
         """
         print(f"[Lyria] Audio receive loop started for room {room_id}")
         try:
@@ -164,8 +174,45 @@ class LyriaService:
             print(f"[Lyria] Receive loop cancelled for room {room_id}")
         except Exception as e:
             print(f"[Lyria] Receive loop error for room {room_id}: {e}")
+            # Clean up dead session
             self._sessions.pop(room_id, None)
             self._receive_tasks.pop(room_id, None)
+            # Attempt to restart the session
+            await self._attempt_restart(room_id)
+
+    async def _attempt_restart(self, room_id: str, max_retries: int = 3):
+        """Try to restart a Lyria session after a stream failure."""
+        from services.room_service import room_service as _rs
+
+        for attempt in range(1, max_retries + 1):
+            # Only restart if room still exists and is playing
+            room = _rs.rooms.get(room_id)
+            if not room or not room.is_playing:
+                print(f"[Lyria] Room {room_id} no longer active, skipping restart")
+                return
+
+            wait = 2 * attempt
+            print(f"[Lyria] Restart attempt {attempt}/{max_retries} for room {room_id} in {wait}s...")
+            await asyncio.sleep(wait)
+
+            try:
+                await self.start_session(room_id, initial_bpm=room.bpm)
+                print(f"[Lyria] Restart succeeded for room {room_id}")
+                _rs.log_event(room_id, "system", "Audio stream recovered")
+                await _rs.broadcast_json(room_id, {
+                    "type": "stream_recovered",
+                    "message": "Audio stream reconnected",
+                })
+                return
+            except Exception as e2:
+                print(f"[Lyria] Restart attempt {attempt} failed for room {room_id}: {e2}")
+
+        # All retries exhausted — notify frontend
+        print(f"[Lyria] All restart attempts failed for room {room_id}")
+        await _rs.broadcast_json(room_id, {
+            "type": "stream_error",
+            "message": "Audio stream lost. Please restart the session.",
+        })
 
     def is_playing(self, room_id: str) -> bool:
         return room_id in self._sessions

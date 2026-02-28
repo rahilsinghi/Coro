@@ -203,6 +203,7 @@ class RoomService:
         return {
             "type": "state_update",
             "room_name": self._room_names.get(room_id, ""),
+            "is_playing": room.is_playing,
             "active_prompts": [p.model_dump() for p in room.active_prompts],
             "bpm": room.bpm,
             "density": room.density,
@@ -249,6 +250,7 @@ class RoomService:
 
     async def _tick_loop(self, room_id: str, callback):
         """Fires callback every 4 seconds with current room state."""
+        consecutive_errors = 0
         while True:
             await asyncio.sleep(4)
             if room_id not in self.rooms:
@@ -265,7 +267,19 @@ class RoomService:
                 room.brightness = float(energy_input["brightness"])
 
             print(f"[Room] Tick fired for room {room_id}, {len(room.current_inputs)} inputs")
-            await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+            try:
+                await callback(room_id, room.current_inputs, room.bpm, room.density, room.brightness)
+                consecutive_errors = 0
+            except Exception as e:
+                consecutive_errors += 1
+                print(f"[Room] Tick callback error #{consecutive_errors} for room {room_id}: {e}")
+                if consecutive_errors >= 3:
+                    print(f"[Room] Too many consecutive errors — notifying room {room_id}")
+                    await self.broadcast_json(room_id, {
+                        "type": "stream_error",
+                        "message": "Music stream interrupted. Try restarting.",
+                    })
+                    consecutive_errors = 0
             # Clear consumed inputs so stale ones don't re-trigger Gemini
             room.current_inputs = {}
 

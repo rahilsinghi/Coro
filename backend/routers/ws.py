@@ -43,18 +43,21 @@ async def _arbitration_tick(room_id: str, current_inputs, current_bpm, current_d
         current_brightness=current_brightness,
     )
 
-    # 2. Update Lyria prompts
-    lyria_prompts = [
-        genai_types.WeightedPrompt(text=p.text, weight=p.weight)
-        for p in result.prompts
-    ]
-    await lyria_service.update_prompts(
-        room_id=room_id,
-        prompts=lyria_prompts,
-        bpm=result.bpm,
-        density=result.density,
-        brightness=result.brightness,
-    )
+    # 2. Update Lyria prompts (non-fatal — audio may continue with old prompts)
+    try:
+        lyria_prompts = [
+            genai_types.WeightedPrompt(text=p.text, weight=p.weight)
+            for p in result.prompts
+        ]
+        await lyria_service.update_prompts(
+            room_id=room_id,
+            prompts=lyria_prompts,
+            bpm=result.bpm,
+            density=result.density,
+            brightness=result.brightness,
+        )
+    except Exception as e:
+        print(f"[WS] Lyria prompt update failed (non-fatal): {e}")
 
     # 3. Update room state
     room_service.update_after_arbitration(
