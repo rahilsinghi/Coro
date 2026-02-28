@@ -1,0 +1,193 @@
+"""
+WebSocket Router — B (Bharath)
+The main WS endpoint. Routes messages to appropriate services.
+Wires Lyria audio broadcast → room broadcast.
+Wires Gemini tick → Lyria prompt update → state broadcast.
+"""
+import json
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from google.genai import types as genai_types
+
+from services.room_service import room_service
+from services.lyria_service import lyria_service
+from services.gemini_service import gemini_service
+
+router = APIRouter()
+
+
+# ─── Wire Lyria audio → room broadcast ───────────────────────────────────────
+
+async def _audio_broadcast_callback(room_id: str, audio_bytes: bytes):
+    """Called by LyriaService for every audio chunk. Forwards to all room clients."""
+    await room_service.broadcast_bytes(room_id, audio_bytes)
+
+lyria_service.broadcast_callback = _audio_broadcast_callback
+
+
+# ─── Wire Gemini tick → Lyria update → state broadcast ───────────────────────
+
+async def _arbitration_tick(room_id: str, current_inputs, current_bpm, current_density, current_brightness):
+    """
+    Called every 4 seconds by RoomService tick loop.
+    1. Call Gemini to arbitrate inputs
+    2. Update Lyria with new prompts
+    3. Update room state
+    4. Broadcast new state to all clients
+    """
+    # 1. Gemini arbitration
+    result = await gemini_service.arbitrate(
+        room_id=room_id,
+        current_inputs=current_inputs,
+        current_bpm=current_bpm,
+        current_density=current_density,
+        current_brightness=current_brightness,
+    )
+
+    # 2. Update Lyria prompts
+    lyria_prompts = [
+        genai_types.WeightedPrompt(text=p.text, weight=p.weight)
+        for p in result.prompts
+    ]
+    await lyria_service.update_prompts(
+        room_id=room_id,
+        prompts=lyria_prompts,
+        bpm=result.bpm,
+        density=result.density,
+        brightness=result.brightness,
+    )
+
+    # 3. Update room state
+    room_service.update_after_arbitration(
+        room_id=room_id,
+        prompts=result.prompts,
+        bpm=result.bpm,
+        density=result.density,
+        brightness=result.brightness,
+    )
+
+    # 4. Broadcast to all clients
+    state_msg = room_service.get_state_update_message(room_id)
+    state_msg["gemini_reasoning"] = result.reasoning
+    await room_service.broadcast_json(room_id, state_msg)
+
+
+# ─── WebSocket Endpoint ───────────────────────────────────────────────────────
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    room_id = None
+    user_id = None
+
+    # WS heartbeat to keep Railway connection alive
+    import asyncio
+    async def heartbeat():
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await websocket.send_json({"type": "ping"})
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(heartbeat())
+
+    try:
+        while True:
+            # Handle both text (JSON) and binary messages
+            data = await websocket.receive()
+
+            if "bytes" in data and data["bytes"]:
+                # Binary from client — not expected but ignore gracefully
+                continue
+
+            if "text" not in data or not data["text"]:
+                continue
+
+            try:
+                msg = json.loads(data["text"])
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+
+            msg_type = msg.get("type")
+            user_id = msg.get("user_id", user_id)
+
+            # ── CREATE ROOM ──────────────────────────────────────────────────
+            if msg_type == "create_room":
+                room = room_service.create_room(host_id=user_id)
+                room_id = room.room_id
+                role = room_service.join_room(room_id, user_id, websocket)
+                join_url = f"?room_id={room_id}"
+                await websocket.send_json({
+                    "type": "room_created",
+                    "room_id": room_id,
+                    "join_url": join_url,
+                    "role": role.value if role else None,
+                })
+
+            # ── JOIN ROOM ────────────────────────────────────────────────────
+            elif msg_type == "join_room":
+                room_id = msg.get("room_id", "").upper()
+                if not room_id or room_id not in room_service.rooms:
+                    await websocket.send_json({"type": "error", "message": f"Room {room_id} not found"})
+                    continue
+                role = room_service.join_room(room_id, user_id, websocket)
+                await websocket.send_json({
+                    "type": "joined",
+                    "room_id": room_id,
+                    "role": role.value if role else None,
+                    "user_id": user_id,
+                })
+
+            # ── START MUSIC ──────────────────────────────────────────────────
+            elif msg_type == "start_music":
+                if not room_id:
+                    await websocket.send_json({"type": "error", "message": "Not in a room"})
+                    continue
+                room = room_service.rooms.get(room_id)
+                if not room:
+                    await websocket.send_json({"type": "error", "message": "Room not found"})
+                    continue
+                if room.host_id != user_id:
+                    await websocket.send_json({"type": "error", "message": "Only host can start music"})
+                    continue
+
+                room.is_playing = True
+                await lyria_service.start_session(room_id, initial_bpm=room.bpm)
+                room_service.start_tick_loop(room_id, _arbitration_tick)
+                await room_service.broadcast_json(room_id, {"type": "music_started"})
+
+            # ── STOP MUSIC ───────────────────────────────────────────────────
+            elif msg_type == "stop_music":
+                if not room_id:
+                    continue
+                room = room_service.rooms.get(room_id)
+                if room and room.host_id == user_id:
+                    room.is_playing = False
+                    room_service.stop_tick_loop(room_id)
+                    await lyria_service.stop_session(room_id)
+                    await room_service.broadcast_json(room_id, {"type": "music_stopped"})
+
+            # ── INPUT UPDATE ─────────────────────────────────────────────────
+            elif msg_type == "input_update":
+                if not room_id:
+                    continue
+                role_str = msg.get("role")
+                payload = msg.get("payload", {})
+                if role_str and payload is not None:
+                    from models.schemas import Role
+                    try:
+                        role = Role(role_str)
+                        room_service.update_input(room_id, role, payload)
+                    except ValueError:
+                        pass  # Unknown role, ignore
+
+    except WebSocketDisconnect:
+        print(f"[WS] Client disconnected: user={user_id}, room={room_id}")
+    except Exception as e:
+        print(f"[WS] Unexpected error: {e}")
+    finally:
+        heartbeat_task.cancel()
+        if room_id and user_id:
+            room_service.remove_connection(room_id, user_id, websocket)
