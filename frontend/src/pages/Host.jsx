@@ -39,7 +39,7 @@ export default function Host() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            🎵 Crowd<span className="text-cs-accent">Synth</span>
+            CORO
           </h1>
           <p className="text-cs-muted text-sm mt-0.5">
             Room <span className="font-mono text-white">{roomId}</span>
@@ -106,11 +106,10 @@ export default function Host() {
           {/* Play / Stop */}
           <button
             onClick={isPlaying ? handleStop : handlePlay}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-              isPlaying
-                ? 'bg-red-600 hover:bg-red-500 text-white'
-                : 'bg-cs-accent hover:bg-purple-500 text-white animate-glow'
-            }`}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${isPlaying
+              ? 'bg-red-600 hover:bg-red-500 text-white'
+              : 'bg-cs-accent hover:bg-blue-400 text-white shadow-[0_0_15px_rgba(0,195,255,0.4)]'
+              }`}
           >
             {isPlaying ? '⏹ Stop Music' : '▶ Start Music'}
           </button>
