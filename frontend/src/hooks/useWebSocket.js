@@ -103,11 +103,24 @@ class WebSocketManager {
         this.store?.reset()
         break
       case 'drop_progress':
+        this.store?.setDropProgress(msg.count)
+        break
       case 'drop_incoming':
       case 'drop_triggered':
+        this.store?.setDropProgress(0)
+        // Trigger visual/haptic effects
+        document.body.classList.add('drop-flash')
+        navigator.vibrate?.([200, 100, 200])
+        setTimeout(() => document.body.classList.remove('drop-flash'), 1000)
+        // Also forwarded to per-component listeners via onMessageCallbacks
+        break
       case 'drop_reset':
       case 'drop_already_voted':
         // Forwarded to per-component listeners via onMessageCallbacks
+        break
+      case 'room_ended':
+        this.store?.clearRoom()
+        window.location.href = '/studio'
         break
       case 'error':
         console.error('[WS] Server error:', msg.message)
@@ -209,7 +222,17 @@ export function useWebSocket() {
     })
   }, [send])
 
+  const leaveRoom = useCallback((userId, roomId) => {
+    send({ type: 'leave_room', user_id: userId, room_id: roomId })
+    store.clearRoom()
+  }, [send, store])
+
+  const endStream = useCallback((userId, roomId) => {
+    send({ type: 'end_stream', user_id: userId, room_id: roomId })
+    store.clearRoom()
+  }, [send, store])
+
   const addListener = useCallback((cb) => manager.addListener(cb), [])
 
-  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, addListener }
+  return { send, createRoom, joinRoom, startMusic, stopMusic, closeRoom, sendInput, leaveRoom, endStream, addListener }
 }

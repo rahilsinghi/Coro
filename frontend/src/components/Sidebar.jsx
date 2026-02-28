@@ -1,14 +1,10 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, MessageSquare, HelpCircle, Play, PlusCircle, Settings, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 
 const SIDEBAR_ITEMS = [
     { id: 'studio', label: 'Studio', icon: LayoutDashboard },
-    { id: 'chat', label: 'Chat AI', icon: MessageSquare },
-    { id: 'how', label: 'How It Works', icon: HelpCircle },
-    { id: 'demo', label: 'Demo', icon: Play },
-    { id: 'create', label: 'Create Room', icon: PlusCircle },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'prompt', label: 'Prompt', icon: MessageSquare },
 ]
 
 export default function Sidebar({ activeItem, onItemClick, expanded, setExpanded, mobileOpen, setMobileOpen }) {

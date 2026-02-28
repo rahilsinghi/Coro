@@ -1,21 +1,39 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useRoomStore } from '../store/roomStore'
 import RibbonWavesBackground from './RibbonWavesBackground.jsx'
+import AuthModals from './AuthModals.jsx'
 
 // ─── GlobeExperience → Landing Hero ──────────────────────────────────────────
 export default function GlobeExperience() {
     const hasEnteredCoro = useRoomStore(s => s.hasEnteredCoro)
     const setEnteredCoro = useRoomStore(s => s.setEnteredCoro)
+    const isAuthed = useRoomStore(s => s.isAuthed)
     const navigate = useNavigate()
     const location = useLocation()
     const isLanding = location.pathname === '/'
     const showHero = !hasEnteredCoro && isLanding
+    const [showNameModal, setShowNameModal] = useState(false)
 
-    const handleEnter = () => {
+    const proceedToStudio = () => {
         setEnteredCoro(true)
         navigate('/studio')
+    }
+
+    const handleEnter = () => {
+        if (!isAuthed) {
+            setShowNameModal(true)
+            return
+        }
+        proceedToStudio()
+    }
+
+    const handleNameModalClose = () => {
+        setShowNameModal(false)
+        // After setting name, proceed to studio
+        const name = localStorage.getItem('cs_display_name')
+        if (name) proceedToStudio()
     }
 
     return (
@@ -175,6 +193,9 @@ export default function GlobeExperience() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Name entry modal — shown when user hasn't set a display name */}
+            <AuthModals isOpen={showNameModal} onClose={handleNameModalClose} />
         </>
     )
 }

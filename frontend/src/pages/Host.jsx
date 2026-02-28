@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
@@ -11,6 +12,8 @@ import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
 import Timeline from '../components/Timeline.jsx'
 import SessionControls from '../components/SessionControls.jsx'
+import MiniPromptBar from '../components/MiniPromptBar.jsx'
+import PlayBar from '../components/PlayBar.jsx'
 import DropButton from '../components/DropButton.jsx'
 
 function formatInputSummary(inputs) {
@@ -22,8 +25,9 @@ function formatInputSummary(inputs) {
 }
 
 export default function Host() {
-  const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs, reset } = useRoomStore()
-  const { startMusic, stopMusic, closeRoom } = useWebSocket()
+  const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs } = useRoomStore()
+  const { startMusic, stopMusic, endStream, closeRoom } = useWebSocket()
+  const clearRoom = useRoomStore((s) => s.clearRoom)
   const { unlock } = useAudioPlayer()
   const navigate = useNavigate()
   const [showQR, setShowQR] = useState(true)
@@ -43,6 +47,12 @@ export default function Host() {
   }
 
   const handleStop = () => stopMusic(userId, roomId)
+
+  const handleEndStream = () => {
+    if (window.confirm("End session for everyone?")) {
+      endStream(userId, roomId)
+    }
+  }
 
   return (
     <div className="flex flex-col p-4 sm:p-6 max-w-7xl mx-auto pb-12 pointer-events-auto">
@@ -87,6 +97,13 @@ export default function Host() {
                   }`}
               >
                 {isPlaying ? 'Stop' : 'Start Stream'}
+              </button>
+              <button
+                onClick={handleEndStream}
+                className="p-2.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 transition-all active:scale-90"
+                title="End Stream"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" /></svg>
               </button>
             </div>
           </div>
@@ -201,7 +218,16 @@ export default function Host() {
                   <p className="text-[10px] font-black uppercase tracking-[0.40em] text-[#00D1FF]">
                     Active Prompt Cloud
                   </p>
-                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-widest">Refreshes every 4s</span>
+                  <span className="flex items-center gap-2 text-[9px] text-white/30 font-bold uppercase tracking-widest">
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                      className="inline-block"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+                    </motion.span>
+                    Refreshes every 4s
+                  </span>
                 </div>
                 <ActivePrompts prompts={activePrompts} />
                 {geminiReasoning && (
@@ -305,7 +331,7 @@ export default function Host() {
               <button
                 onClick={() => {
                   closeRoom(userId, roomId)
-                  reset()
+                  clearRoom()
                   navigate('/')
                 }}
                 className="w-full py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
@@ -319,14 +345,41 @@ export default function Host() {
               </button>
             </div>
           </div>
+          <MiniPromptBar />
+          <PlayBar />
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 opacity-50">
-          <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-            <span className="text-3xl">🎹</span>
+        <div className="flex flex-col items-center justify-center py-32 space-y-10">
+          <div className="relative">
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.1, 0.2, 0.1],
+              }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 bg-[#00D1FF] blur-[60px] rounded-full"
+            />
+            <div className="relative w-28 h-28 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-2xl shadow-2xl">
+              <span className="text-5xl drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">🎹</span>
+            </div>
           </div>
-          <p className="text-sm font-black uppercase tracking-[0.3em] text-white/40">No Active Session</p>
-          <p className="text-xs text-white/20 mt-2 text-center">Initialize a session above to start the studio.</p>
+          <div className="text-center space-y-3 max-w-sm px-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#00D1FF] drop-shadow-[0_0_8px_rgba(0,209,255,0.4)]">Studio Standby</p>
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Ready for Genesis</h2>
+            <p className="text-sm text-white/30 leading-relaxed font-medium">
+              Initialize a session using the controls above to start your collective sonic journey powered by Lyria & Gemini.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {[0, 1, 2].map(i => (
+              <motion.div
+                key={i}
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 1.5, delay: i * 0.2, repeat: Infinity }}
+                className="w-1.5 h-1.5 rounded-full bg-[#00D1FF]/20"
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

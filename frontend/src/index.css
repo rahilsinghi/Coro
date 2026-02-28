@@ -81,6 +81,23 @@
     border-color: #00D1FF;
     box-shadow: 0 0 15px rgba(0, 209, 255, 0.2);
   }
+
+  /* Utility Cards */
+  .card {
+    @apply bg-black/40 backdrop-blur-xl border border-white/5 rounded-[1.5rem] p-6;
+  }
+
+  .tile {
+    @apply bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white/40 font-black text-[10px] uppercase tracking-widest transition-all;
+  }
+
+  .tile:hover {
+    @apply bg-white/10 text-white/60;
+  }
+
+  .tile-active {
+    @apply bg-[#00D1FF]/20 border-[#00D1FF]/50 text-[#00D1FF] shadow-[0_0_15px_rgba(0,209,255,0.2)];
+  }
 }
 
 /* ── Ribbon wave drift animations ─────────────────────────────────────── */
@@ -201,4 +218,57 @@
 
 .shockwave {
   animation: shockwave 0.6s ease-out forwards;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 10px rgba(0, 209, 255, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(0, 209, 255, 0.6);
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(0, 209, 255, 0.2);
+  }
+}
+
+.pulse-glow {
+  animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes breathe {
+
+  0%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 8, 22, 0.4);
+  }
+
+  50% {
+    border-color: rgba(0, 209, 255, 0.4);
+    background-color: rgba(0, 209, 255, 0.05);
+  }
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
 }

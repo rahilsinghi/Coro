@@ -129,8 +129,30 @@ class RoomService:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        # NOTE: Do NOT pop user_roles here — role persists across reconnects
-        # Roles are only cleaned up when the room is destroyed
+
+    def remove_user(self, room_id: str, user_id: str):
+        """Permenantly remove a user and their role (e.g. on explicit Leave Room)."""
+        if room_id in self.user_roles:
+            role = self.user_roles[room_id].pop(user_id, None)
+            if role:
+                display_name = self.user_display_names.get(room_id, {}).get(user_id, user_id[:8])
+                self.log_event(room_id, "leave", f"{display_name} left the room")
+        if room_id in self.user_display_names:
+            self.user_display_names[room_id].pop(user_id, None)
+
+    def destroy_room(self, room_id: str):
+        """Cleanup all room state and stop the tick loop."""
+        self.stop_tick_loop(room_id)
+        self.rooms.pop(room_id, None)
+        self.connections.pop(room_id, None)
+        self.user_sockets.pop(room_id, None)
+        self.user_roles.pop(room_id, None)
+        self._host_devices.pop(room_id, None)
+        self._drop_presses.pop(room_id, None)
+        self._room_names.pop(room_id, None)
+        self.user_display_names.pop(room_id, None)
+        self._timeline.pop(room_id, None)
+        print(f"[Room] Destroyed room {room_id}")
 
     def get_drop_threshold(self, room_id: str) -> int:
         """Required votes = ceil(participants / 2), minimum 1."""

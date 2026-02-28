@@ -49,6 +49,7 @@ export const useRoomStore = create((set) => ({
   participants: [],
   timeline: [],
   applauseLevel: 0,
+  dropProgress: 0,
 
   setEnteredCoro: (val) => {
     sessionStorage.setItem('hasEnteredCoro', val)
@@ -61,6 +62,9 @@ export const useRoomStore = create((set) => ({
 
   setConnected: (val) => set({ isConnected: val }),
   setPlaying: (val) => set({ isPlaying: val }),
+  setApplauseLevel: (val) => set({ applauseLevel: val }),
+  setDropProgress: (val) => set({ dropProgress: val }),
+  setTimeline: (val) => set({ timeline: val }),
 
   applyStateUpdate: (msg) =>
     set((state) => ({
@@ -74,11 +78,10 @@ export const useRoomStore = create((set) => ({
       participants: msg.participants || [],
       timeline: msg.timeline || [],
       roomName: msg.room_name || '',
+      applauseLevel: msg.applause_level || 0,
       // Sync isPlaying from server — fixes stale state after reconnect
       ...(msg.is_playing !== undefined ? { isPlaying: msg.is_playing } : {}),
     })),
-
-  setApplauseLevel: (val) => set({ applauseLevel: val }),
 
   reset: () => {
     sessionStorage.removeItem('cs_room')
@@ -96,6 +99,29 @@ export const useRoomStore = create((set) => ({
       influenceWeights: {},
       participants: [],
       timeline: [],
+      applauseLevel: 0,
+      dropProgress: 0,
+    })
+  },
+  clearRoom: () => {
+    sessionStorage.removeItem('cs_room')
+    set({
+      roomId: null,
+      roomName: '',
+      role: null,
+      isHost: false,
+      isPlaying: false,
+      activePrompts: [],
+      bpm: 100,
+      density: 0.5,
+      brightness: 0.5,
+      currentInputs: {},
+      influenceWeights: {},
+      geminiReasoning: '',
+      participants: [],
+      timeline: [],
+      applauseLevel: 0,
+      dropProgress: 0,
     })
   },
 }))

@@ -21,18 +21,18 @@ export default function ActivePrompts({ prompts = [] }) {
             animate={{ opacity: 0.4 + p.weight * 0.6, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25, duration: 0.5 }}
-            className="flex items-center gap-2.5 bg-cs-bg/10 backdrop-blur-md border border-cs-border rounded-full px-4 py-2 hover:border-cs-accent transition-colors"
+            className="flex items-center gap-2.5 bg-[#00D1FF]/5 backdrop-blur-xl border border-[#00D1FF]/10 rounded-full px-4 py-2 hover:border-[#00D1FF]/40 transition-all duration-300 group hover:shadow-[0_0_20px_rgba(0,209,255,0.15)] hover:-translate-y-0.5"
           >
             <div
-              className="w-2 h-2 rounded-full bg-cs-accent shadow-[0_0_8px_#00c3ff]"
+              className="w-2 h-2 rounded-full bg-[#00D1FF] shadow-[0_0_10px_#00D1FF] group-hover:scale-125 transition-transform"
             />
-            <span className="text-sm font-medium text-cs-text">{p.text}</span>
-            <span className="text-[10px] text-cs-muted font-mono uppercase tracking-tighter bg-cs-border/30 px-1.5 py-0.5 rounded">
+            <span className="text-sm font-bold text-white/80 group-hover:text-white transition-colors tracking-tight">{p.text}</span>
+            <span className="text-[10px] text-[#00D1FF] font-black uppercase tracking-tighter bg-[#00D1FF]/10 px-2 py-0.5 rounded-lg">
               {Math.round(p.weight * 100)}%
             </span>
           </motion.div>
         ))}
       </AnimatePresence>
-    </div>
+    </div >
   )
 }
