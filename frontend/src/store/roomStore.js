@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 
+// Rehydrate room session from sessionStorage on load
+const savedRoom = JSON.parse(sessionStorage.getItem('cs_room') || 'null')
+
 export const useRoomStore = create((set) => ({
   // Connection
-  roomId: null,
-  userId: null,
-  role: null,
-  isHost: false,
+  roomId: savedRoom?.roomId || null,
+  userId: savedRoom?.userId || null,
+  role: savedRoom?.role || null,
+  isHost: savedRoom?.isHost || false,
   isConnected: false,
   isPlaying: false,
   isAuthed: sessionStorage.getItem('isAuthed') === 'true',
@@ -30,8 +33,10 @@ export const useRoomStore = create((set) => ({
     sessionStorage.setItem('hasEnteredCoro', val)
     set({ hasEnteredCoro: val })
   },
-  setRoom: (roomId, userId, role, isHost) =>
-    set({ roomId, userId, role, isHost }),
+  setRoom: (roomId, userId, role, isHost) => {
+    sessionStorage.setItem('cs_room', JSON.stringify({ roomId, userId, role, isHost }))
+    set({ roomId, userId, role, isHost })
+  },
 
   setConnected: (val) => set({ isConnected: val }),
   setPlaying: (val) => set({ isPlaying: val }),
@@ -48,7 +53,8 @@ export const useRoomStore = create((set) => ({
       participants: msg.participants || [],
     }),
 
-  reset: () =>
+  reset: () => {
+    sessionStorage.removeItem('cs_room')
     set({
       roomId: null,
       userId: null,
@@ -61,5 +67,6 @@ export const useRoomStore = create((set) => ({
       currentInputs: {},
       influenceWeights: {},
       participants: [],
-    }),
+    })
+  },
 }))

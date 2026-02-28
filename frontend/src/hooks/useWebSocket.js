@@ -34,6 +34,13 @@ class WebSocketManager {
     ws.onopen = () => {
       console.log('[WS] Connected')
       this.store?.setConnected(true)
+
+      // Auto-rejoin room if we have a persisted session (e.g. page refresh)
+      const saved = JSON.parse(sessionStorage.getItem('cs_room') || 'null')
+      if (saved?.roomId && saved?.userId) {
+        console.log('[WS] Rejoining room', saved.roomId, 'as', saved.userId)
+        this.send({ type: 'join_room', room_id: saved.roomId, user_id: saved.userId })
+      }
     }
 
     ws.onclose = () => {
