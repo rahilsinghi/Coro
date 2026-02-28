@@ -25,6 +25,8 @@ export const useRoomStore = create((set) => ({
   influenceWeights: {},
   geminiReasoning: '',
   participants: [],
+  timeline: [],
+  applauseLevel: 0,
 
   setEnteredCoro: (val) => {
     sessionStorage.setItem('hasEnteredCoro', val)
@@ -46,7 +48,10 @@ export const useRoomStore = create((set) => ({
       influenceWeights: msg.influence_weights || {},
       geminiReasoning: msg.gemini_reasoning || '',
       participants: msg.participants || [],
+      ...(msg.timeline ? { timeline: msg.timeline } : {}),
     }),
+
+  setApplauseLevel: (val) => set({ applauseLevel: val }),
 
   reset: () =>
     set({

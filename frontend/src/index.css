@@ -82,3 +82,39 @@
     box-shadow: 0 0 15px rgba(0, 209, 255, 0.2);
   }
 }
+
+/* ── Drop flash: full-screen brightness burst on drop_triggered ── */
+@keyframes dropFlash {
+  0% {
+    filter: brightness(3) saturate(2.5) hue-rotate(20deg);
+  }
+
+  40% {
+    filter: brightness(2) saturate(2);
+  }
+
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+
+.drop-flash {
+  animation: dropFlash 0.8s ease-out forwards;
+}
+
+/* ── Shockwave ring expanding from the DROP button ── */
+@keyframes shockwave {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.shockwave {
+  animation: shockwave 0.6s ease-out forwards;
+}

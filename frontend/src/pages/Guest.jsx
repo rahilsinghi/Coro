@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import { useRoomStore } from '../store/roomStore'
@@ -153,8 +153,16 @@ function JoinCard() {
 export default function Guest() {
   const { role, roomId, userId, isPlaying, activePrompts } = useRoomStore()
   const { unlock } = useAudioPlayer()
-  const { sendInput } = useWebSocket()
+  const { send, sendInput, addListener } = useWebSocket()
   const [tab, setTab] = useState('studio')
+
+  // Drop button state
+  const [dropProgress, setDropProgress] = useState(0)
+  const [showShock, setShowShock] = useState(false)
+
+  // Applause / mic state
+  const [micEnabled, setMicEnabled] = useState(false)
+  const micStreamRef = useRef(null)
 
   // Unlock audio on first interaction
   useEffect(() => {
@@ -167,8 +175,71 @@ export default function Guest() {
     }
   }, [unlock])
 
+  // Listen for drop WS events (drop_progress / drop_triggered)
+  useEffect(() => {
+    const cleanup = addListener((msg) => {
+      if (msg.type === 'drop_progress') {
+        setDropProgress(msg.count ?? 0)
+      }
+      if (msg.type === 'drop_triggered') {
+        document.body.classList.add('drop-flash')
+        navigator.vibrate?.([200, 100, 200])
+        setTimeout(() => document.body.classList.remove('drop-flash'), 1000)
+        setDropProgress(0)
+      }
+    })
+    return cleanup
+  }, [addListener])
+
+  // Cleanup mic stream on unmount
+  useEffect(() => {
+    return () => {
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop())
+        clearInterval(micStreamRef.current._interval)
+      }
+    }
+  }, [])
+
+  const handleDrop = () => {
+    send({ type: 'drop', user_id: userId, room_id: roomId })
+    navigator.vibrate?.(100)
+    setShowShock(true)
+    setTimeout(() => setShowShock(false), 700)
+  }
+
+  const toggleMic = async () => {
+    if (micEnabled) {
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      clearInterval(micStreamRef.current?._interval)
+      micStreamRef.current = null
+      setMicEnabled(false)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micStreamRef.current = stream
+      const ctx = new AudioContext()
+      const analyser = ctx.createAnalyser()
+      const source = ctx.createMediaStreamSource(stream)
+      source.connect(analyser)
+      analyser.fftSize = 256
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      setMicEnabled(true)
+      const interval = setInterval(() => {
+        analyser.getByteFrequencyData(data)
+        const avg = data.reduce((a, b) => a + b, 0) / data.length / 255
+        send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: avg })
+      }, 500)
+      micStreamRef.current._interval = interval
+    } catch (e) {
+      console.warn('[Mic] Permission denied or unavailable:', e)
+    }
+  }
+
   const inRoom = !!(role && roomId)
   const roleInfo = ROLES[role]
+
 
   return (
     <div className="min-h-screen flex flex-col px-4 sm:px-6 max-w-2xl mx-auto pt-20 pb-12 pointer-events-auto">
@@ -288,6 +359,57 @@ export default function Guest() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* ── APPLAUSE MIC TOGGLE ── */}
+              <div
+                className="flex items-center justify-between px-5 py-4 rounded-2xl"
+                style={{ background: 'rgba(0,12,30,0.55)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.40)' }}>👏 Crowd Energy</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.22)' }}>Share your mic to energise the room</p>
+                </div>
+                <button
+                  onClick={toggleMic}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
+                  style={micEnabled
+                    ? { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' }
+                    : { background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }
+                  }
+                >
+                  {micEnabled ? '🎤 Stop' : '🎤 Enable'}
+                </button>
+              </div>
+
+              {/* ── DROP BUTTON ── */}
+              {isPlaying && (
+                <div className="relative mt-2">
+                  {/* Shockwave ring */}
+                  {showShock && (
+                    <div
+                      className="shockwave absolute inset-0 rounded-2xl pointer-events-none"
+                      style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.45) 0%, transparent 70%)' }}
+                    />
+                  )}
+                  <button
+                    onClick={handleDrop}
+                    className="w-full py-6 rounded-2xl text-white text-2xl font-black uppercase tracking-widest transition-transform active:scale-95"
+                    style={{
+                      background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
+                      boxShadow: '0 0 30px rgba(239,68,68,0.50)',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
+                  >
+                    💥 DROP
+                  </button>
+                  {dropProgress > 0 && (
+                    <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
+                      {dropProgress}/3 ready...
+                    </p>
+                  )}
                 </div>
               )}
             </div>

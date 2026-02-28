@@ -7,10 +7,11 @@ import { ROLES } from '../lib/constants.js'
 import AudioVisualizer from '../components/AudioVisualizer.jsx'
 import InfluenceMeter from '../components/InfluenceMeter.jsx'
 import ActivePrompts from '../components/ActivePrompts.jsx'
+import Timeline from '../components/Timeline.jsx'
 import { TabSwitcher, QuickActionsPanel } from '../components/StudioTabs.jsx'
 
 export default function Host() {
-  const { roomId, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants } = useRoomStore()
+  const { roomId, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
   const [showQR, setShowQR] = useState(true)
@@ -180,6 +181,31 @@ export default function Host() {
               )}
             </div>
 
+            {/* 👏 Applause Meter */}
+            <div
+              className="rounded-[2rem] px-6 py-5"
+              style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.40em]" style={{ color: 'rgba(0,209,255,0.65)' }}>
+                  👏 Crowd Energy
+                </p>
+                <span className="text-[9px] text-white/30 font-bold uppercase tracking-widest">
+                  {Math.round(applauseLevel * 100)}%
+                </span>
+              </div>
+              <div className="w-full rounded-full h-3 overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <div
+                  className="h-full transition-all duration-300 rounded-full"
+                  style={{
+                    width: `${Math.round(applauseLevel * 100)}%`,
+                    background: 'linear-gradient(to right, #22c55e, #facc15, #ef4444)',
+                    boxShadow: applauseLevel > 0.6 ? '0 0 12px rgba(239,68,68,0.5)' : 'none',
+                  }}
+                />
+              </div>
+            </div>
+
             {/* QR Code */}
             {showQR && (
               <div
@@ -199,6 +225,17 @@ export default function Host() {
                 </button>
               </div>
             )}
+
+            {/* 📜 Session Story — Timeline */}
+            <div
+              className="rounded-[2rem] p-6"
+              style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4" style={{ color: 'rgba(0,209,255,0.65)' }}>
+                📜 Session Story
+              </p>
+              <Timeline events={timeline} />
+            </div>
 
             {/* Band Members */}
             <div
