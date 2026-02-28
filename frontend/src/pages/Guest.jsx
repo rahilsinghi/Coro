@@ -164,15 +164,12 @@ function formatInputSummary(inputs) {
 
 // ─── Main Guest page
 export default function Guest() {
-  const { role, roomId, userId, isPlaying, activePrompts, participants, currentInputs, dropProgress } = useRoomStore()
+  const { role, roomId, userId, isPlaying, activePrompts, participants, currentInputs } = useRoomStore()
   const { unlock } = useAudioPlayer()
   const { send, sendInput, addListener, leaveRoom } = useWebSocket()
   const clearRoom = useRoomStore((s) => s.clearRoom)
   const navigate = useNavigate()
   const [tab, setTab] = useState('studio')
-
-  // UI state
-  const [showShock, setShowShock] = useState(false)
 
   // Applause / mic state
   const [micEnabled, setMicEnabled] = useState(false)
@@ -261,12 +258,6 @@ export default function Guest() {
       leaveRoom(userId, roomId)
       navigate('/studio')
     }
-  }
-
-  const handleDrop = () => {
-    send({ type: 'drop_vote', user_id: userId, room_id: roomId })
-    setShowShock(true)
-    setTimeout(() => setShowShock(false), 600)
   }
 
   const inRoom = !!(role && roomId)
@@ -467,34 +458,7 @@ export default function Guest() {
                 </div>
 
                 {/* ── DROP BUTTON ── */}
-                {isPlaying && (
-                  <div className="relative mt-2">
-                    {/* Shockwave ring */}
-                    {showShock && (
-                      <div
-                        className="shockwave absolute inset-0 rounded-2xl pointer-events-none"
-                        style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.45) 0%, transparent 70%)' }}
-                      />
-                    )}
-                    <button
-                      onClick={handleDrop}
-                      className="w-full py-6 rounded-2xl text-white text-2xl font-black uppercase tracking-widest transition-transform active:scale-95"
-                      style={{
-                        background: 'linear-gradient(135deg, #dc2626 0%, #f97316 100%)',
-                        boxShadow: '0 0 30px rgba(239,68,68,0.50)',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 52px rgba(239,68,68,0.75)'}
-                      onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(239,68,68,0.50)'}
-                    >
-                      DROP
-                    </button>
-                    {dropProgress > 0 && (
-                      <p className="text-center text-orange-400 text-sm mt-2 font-bold animate-bounce">
-                        {dropProgress}/3 ready...
-                      </p>
-                    )}
-                  </div>
-                )}
+                {isPlaying && <DropButton userId={userId} roomId={roomId} />}
               </div>
             )}
           </>
