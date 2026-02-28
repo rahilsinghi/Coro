@@ -31,10 +31,9 @@ export default function MiniPromptBar() {
 
     const handlePreset = (preset) => {
         if (!roomId || !isConnected) return
-        sendInput(userId, roomId, sendRole, { custom_prompt: preset.text })
+        setPrompt(preset.text)
         setSentPreset(preset.label)
-        setFlash(true)
-        setTimeout(() => { setFlash(false); setSentPreset(null) }, 800)
+        setTimeout(() => setSentPreset(null), 600)
     }
 
     if (!roomId) return null
