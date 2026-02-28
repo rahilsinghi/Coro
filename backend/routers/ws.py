@@ -391,24 +391,28 @@ async def websocket_endpoint(websocket: WebSocket):
                     room = room_service.rooms.get(room_id)
                     drop_prompts = [
                         genai_types.WeightedPrompt(
-                            text="massive bass drop, thundering sub-bass, distorted 808 kick, crowd energy explosion, euphoric peak",
+                            text="massive bass drop, thundering sub-bass, hard-hitting kick, louder amplified energy, crowd explosion, euphoric peak",
                             weight=0.7
                         ),
                         genai_types.WeightedPrompt(
-                            text="intense electronic drop, driving beat, powerful climax, maximum energy release",
+                            text="intense powerful drop, driving energetic beat, full-force climax, amplified maximum volume",
                             weight=0.3
                         ),
                     ]
-                    # Build-up steps fired at t=1s and t=2s during the countdown.
-                    # Each step ramps density/brightness and blends a tension overlay
-                    # on top of the current prompts — BPM is held constant so
-                    # reset_context() never fires and the audio stays continuous.
-                    build_steps = [
-                        (0.75, 0.80, 0.25),   # t=1s: subtle rise
-                        (0.92, 0.96, 0.50),   # t=2s: strong build
-                    ]
-                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts):
-                        for density_t, brightness_t, overlay_w in build_steps:
+                    # Snapshot room state at vote time so build steps always ramp UP.
+                    # density/brightness floors prevent the build from ever dipping
+                    # below the current energy level.
+                    snap_density = room.density if room else 0.5
+                    snap_brightness = room.brightness if room else 0.5
+
+                    async def _fire_drop(rid=room_id, r=room, dp=drop_prompts,
+                                         floor_d=snap_density, floor_b=snap_brightness):
+                        # Build steps: always increase from current state, never dip.
+                        # BPM held constant — no reset_context(), audio stays continuous.
+                        for overlay_w, density_t, brightness_t in [
+                            (0.30, 0.88, 0.88),   # t=1s: strong lift from current floor
+                            (0.55, 0.96, 0.96),   # t=2s: near-peak build
+                        ]:
                             await asyncio.sleep(1)
                             if not (r and r.is_playing):
                                 break
@@ -419,7 +423,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 ]
                                 build_prompts = [
                                     genai_types.WeightedPrompt(
-                                        text="rising tension, building energy, anticipation, crescendo",
+                                        text="rising tension, building energy, anticipation, crescendo, louder",
                                         weight=overlay_w,
                                     )
                                 ] + base[:1]
@@ -427,14 +431,15 @@ async def websocket_endpoint(websocket: WebSocket):
                                     await lyria_service.update_prompts(
                                         room_id=rid,
                                         prompts=build_prompts,
-                                        bpm=session_data.get("bpm", r.bpm),  # hold BPM — no reset_context()
-                                        density=density_t,
-                                        brightness=brightness_t,
+                                        bpm=session_data.get("bpm", r.bpm),
+                                        # max() ensures we never go below current energy
+                                        density=max(floor_d, density_t),
+                                        brightness=max(floor_b, brightness_t),
                                     )
                                 except Exception as e:
                                     print(f"[WS] Drop build step failed (non-fatal): {e}")
 
-                        # t=3s: drop — keep same BPM so reset_context() never fires
+                        # t=3s: drop — full energy (1.0/1.0), same BPM, no reset_context()
                         await asyncio.sleep(1)
                         if r and r.is_playing:
                             try:
@@ -443,9 +448,9 @@ async def websocket_endpoint(websocket: WebSocket):
                                 await lyria_service.update_prompts(
                                     room_id=rid,
                                     prompts=dp,
-                                    bpm=current_bpm,  # same BPM — smooth prompt morph, no cut
+                                    bpm=current_bpm,  # same BPM — no cut, smooth morph
                                     density=1.0,
-                                    brightness=0.85,
+                                    brightness=1.0,   # full brightness — never a dip
                                 )
                             except Exception as e:
                                 print(f"[WS] Drop Lyria update failed (non-fatal): {e}")
