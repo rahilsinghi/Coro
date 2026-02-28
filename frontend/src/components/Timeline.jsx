@@ -29,118 +29,129 @@ export default function Timeline({ events = [] }) {
     const scrollRef = useRef(null)
     const [prevCount, setPrevCount] = useState(0)
 
+    // Auto-scroll to the right (newest) on new events
     useEffect(() => {
-        if (events.length > prevCount) {
-            scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+        if (events.length > prevCount && scrollRef.current) {
+            scrollRef.current.scrollTo({
+                left: scrollRef.current.scrollWidth,
+                behavior: 'smooth',
+            })
         }
         setPrevCount(events.length)
     }, [events.length])
 
     if (events.length === 0) {
         return (
-            <p className="text-sm italic" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                Waiting for inputs...
-            </p>
+            <div className="flex items-center justify-center py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.20)' }}>
+                    Waiting for inputs...
+                </p>
+            </div>
         )
     }
 
-    const reversed = [...events].reverse()
-
     return (
-        <div
-            ref={scrollRef}
-            className="timeline-scroll max-h-64 overflow-y-auto relative"
-        >
+        <div className="relative">
             <style>{`
-                .timeline-scroll::-webkit-scrollbar { display: none; }
-                .timeline-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-                @keyframes tl-fade-in {
-                    from { opacity: 0; transform: translateY(-8px); }
-                    to { opacity: 1; transform: translateY(0); }
+                .htl-scroll::-webkit-scrollbar { display: none; }
+                .htl-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+                @keyframes htl-enter {
+                    from { opacity: 0; transform: translateX(12px) scale(0.9); }
+                    to   { opacity: 1; transform: translateX(0) scale(1); }
                 }
-                @keyframes tl-glow-pulse {
+                @keyframes htl-glow {
                     0%, 100% { box-shadow: 0 0 4px 2px var(--node-color); }
-                    50% { box-shadow: 0 0 12px 4px var(--node-color); }
+                    50%      { box-shadow: 0 0 10px 3px var(--node-color); }
                 }
-                .tl-entry { animation: tl-fade-in 0.3s ease-out both; }
-                .tl-node-glow { animation: tl-glow-pulse 2s ease-in-out infinite; }
+                .htl-event { animation: htl-enter 0.3s ease-out both; }
+                .htl-glow  { animation: htl-glow 2s ease-in-out infinite; }
             `}</style>
 
-            {/* Spine line */}
+            {/* Horizontal scroll container */}
             <div
-                className="absolute top-0 bottom-0"
-                style={{
-                    left: '62px',
-                    width: '2px',
-                    background: 'rgba(0,209,255,0.15)',
-                }}
-            />
+                ref={scrollRef}
+                className="htl-scroll flex items-stretch gap-0 overflow-x-auto relative"
+                style={{ paddingBottom: '4px' }}
+            >
+                {/* Horizontal spine line */}
+                <div
+                    className="absolute left-0 right-0"
+                    style={{
+                        top: '9px',
+                        height: '2px',
+                        background: 'rgba(0,209,255,0.15)',
+                    }}
+                />
 
-            {reversed.map((e, i) => {
-                const src = e.source?.toLowerCase() || 'default'
-                const emoji = EVENT_EMOJIS[src] || EVENT_EMOJIS.default
-                const color = SOURCE_COLORS[src] || SOURCE_COLORS.default
-                const time = e.time
-                    ? new Date(e.time * 1000).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                      })
-                    : ''
-                const isSpecial = src === 'drop' || src === 'prompt' || src === 'gemini'
+                {events.map((e, i) => {
+                    const src = e.source?.toLowerCase() || 'default'
+                    const emoji = EVENT_EMOJIS[src] || EVENT_EMOJIS.default
+                    const color = SOURCE_COLORS[src] || SOURCE_COLORS.default
+                    const time = e.time
+                        ? new Date(e.time * 1000).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                          })
+                        : ''
+                    const isSpecial = src === 'drop' || src === 'prompt' || src === 'gemini'
 
-                return (
-                    <div
-                        key={`${e.time}-${i}`}
-                        className="tl-entry flex items-center"
-                        style={{
-                            animationDelay: `${i * 0.03}s`,
-                            padding: '7px 0',
-                        }}
-                    >
-                        {/* Timestamp */}
+                    return (
                         <div
-                            className="shrink-0 text-right"
+                            key={`${e.time}-${i}`}
+                            className="htl-event flex flex-col items-center shrink-0 relative"
                             style={{
-                                width: '54px',
-                                fontSize: '10px',
-                                fontFamily: 'monospace',
-                                color: 'rgba(255,255,255,0.3)',
-                                letterSpacing: '0.02em',
-                                paddingRight: '8px',
+                                animationDelay: `${Math.max(0, i - (events.length - 5)) * 0.06}s`,
+                                width: '72px',
+                                paddingTop: '0',
                             }}
                         >
-                            {time}
-                        </div>
-
-                        {/* Node on spine */}
-                        <div
-                            className={`shrink-0 rounded-full z-10 ${isSpecial ? 'tl-node-glow' : ''}`}
-                            style={{
-                                width: '10px',
-                                height: '10px',
-                                backgroundColor: color,
-                                '--node-color': `${color}88`,
-                                border: `2px solid ${color}`,
-                                boxShadow: isSpecial ? undefined : `0 0 6px ${color}30`,
-                            }}
-                        />
-
-                        {/* Event content */}
-                        <div className="flex items-center gap-1.5 pl-3 min-w-0 flex-1">
-                            <span className="text-sm shrink-0">{emoji}</span>
-                            <span
-                                className="text-sm truncate leading-snug"
+                            {/* Node on spine */}
+                            <div
+                                className={`shrink-0 rounded-full z-10 ${isSpecial ? 'htl-glow' : ''}`}
                                 style={{
-                                    color: isSpecial ? color : 'rgba(255,255,255,0.75)',
+                                    width: '10px',
+                                    height: '10px',
+                                    marginTop: '4px',
+                                    backgroundColor: color,
+                                    '--node-color': `${color}88`,
+                                    border: `2px solid ${color}`,
+                                    boxShadow: isSpecial ? undefined : `0 0 6px ${color}30`,
+                                }}
+                            />
+
+                            {/* Connector line to content */}
+                            <div style={{ width: '1px', height: '6px', background: `${color}40` }} />
+
+                            {/* Event pill */}
+                            <div
+                                className="flex flex-col items-center gap-0.5 px-1 py-1 rounded-lg w-full"
+                                style={{
+                                    background: isSpecial ? `${color}12` : 'rgba(255,255,255,0.03)',
+                                    border: isSpecial ? `1px solid ${color}30` : '1px solid rgba(255,255,255,0.06)',
                                 }}
                             >
-                                {e.text}
-                            </span>
+                                <span className="text-sm leading-none">{emoji}</span>
+                                <span
+                                    className="text-[9px] font-bold leading-tight text-center w-full truncate px-0.5"
+                                    style={{ color: isSpecial ? color : 'rgba(255,255,255,0.60)' }}
+                                >
+                                    {e.text}
+                                </span>
+                                <span
+                                    className="text-[7px] font-mono leading-none"
+                                    style={{ color: 'rgba(255,255,255,0.20)' }}
+                                >
+                                    {time}
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                )
-            })}
+                    )
+                })}
+
+                {/* Spacer so last item isn't flush with edge */}
+                <div className="shrink-0 w-2" />
+            </div>
         </div>
     )
 }

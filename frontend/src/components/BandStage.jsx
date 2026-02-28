@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ROLES, ROLE_COLORS } from '../lib/constants.js'
 
 function Face({ x, y, skin = '#F7B58D', hair = '#2A2140', smile = '#2A2140' }) {
@@ -185,6 +185,43 @@ const ROLE_SVG = {
 }
 
 export default function BandStage({ participants = [], isPlaying = false, currentInputs = {} }) {
+    // ── Comic chat bubbles ──
+    const [bubbles, setBubbles] = useState({})
+    const prevInputsRef = useRef({})
+
+    useEffect(() => {
+        const prev = prevInputsRef.current
+        const fresh = {}
+        let changed = false
+
+        participants.forEach(p => {
+            const text = formatInputBrief(p.role, currentInputs[p.role])
+            const prevText = formatInputBrief(p.role, prev[p.role])
+            if (text && text !== prevText) {
+                fresh[p.role] = { text, ts: Date.now() }
+                changed = true
+            }
+        })
+
+        if (changed) {
+            setBubbles(b => ({ ...b, ...fresh }))
+            const roles = Object.keys(fresh)
+            const stamps = { ...fresh }
+            const timer = setTimeout(() => {
+                setBubbles(b => {
+                    const next = { ...b }
+                    roles.forEach(r => {
+                        if (next[r]?.ts === stamps[r].ts) delete next[r]
+                    })
+                    return next
+                })
+            }, 4000)
+            return () => clearTimeout(timer)
+        }
+
+        prevInputsRef.current = { ...currentInputs }
+    }, [currentInputs, participants])
+
     return (
         <div
             className="relative rounded-[2rem] overflow-hidden select-none"
@@ -236,6 +273,19 @@ export default function BandStage({ participants = [], isPlaying = false, curren
                 }
 
                 .bs-char { animation: bs-enter 0.5s ease-out both; }
+
+                @keyframes bs-bubble-in {
+                    from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.85); }
+                    to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                }
+                @keyframes bs-bubble-out {
+                    0%   { opacity: 1; }
+                    75%  { opacity: 1; }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+                }
+                .bs-bubble {
+                    animation: bs-bubble-in 0.25s ease-out both;
+                }
             `}</style>
 
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -306,10 +356,12 @@ export default function BandStage({ participants = [], isPlaying = false, curren
                         const CharSVG = ROLE_SVG[role]
                         const inputSummary = formatInputBrief(role, currentInputs[role])
 
+                        const bubble = bubbles[role]
+
                         return (
                             <div
                                 key={p.user_id}
-                                className="bs-char flex flex-col items-center"
+                                className="bs-char flex flex-col items-center relative"
                                 style={{
                                     animationDelay: `${i * 0.1}s`,
                                     flex: '1 1 0',
@@ -317,6 +369,45 @@ export default function BandStage({ participants = [], isPlaying = false, curren
                                     minWidth: '100px',
                                 }}
                             >
+                                {/* Comic chat bubble */}
+                                {bubble && (
+                                    <div
+                                        key={bubble.ts}
+                                        className="bs-bubble absolute z-20 left-1/2 whitespace-nowrap"
+                                        style={{
+                                            top: '-8px',
+                                            transform: 'translateX(-50%)',
+                                            background: 'rgba(0,0,0,0.75)',
+                                            backdropFilter: 'blur(8px)',
+                                            border: `1px solid ${color}55`,
+                                            borderRadius: '10px',
+                                            padding: '4px 10px',
+                                            fontSize: '11px',
+                                            fontWeight: 800,
+                                            color: color,
+                                            maxWidth: '160px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}
+                                    >
+                                        {bubble.text}
+                                        {/* Tail */}
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: '-5px',
+                                                left: '50%',
+                                                transform: 'translateX(-50%) rotate(45deg)',
+                                                width: '8px',
+                                                height: '8px',
+                                                background: 'rgba(0,0,0,0.75)',
+                                                borderRight: `1px solid ${color}55`,
+                                                borderBottom: `1px solid ${color}55`,
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
                                 <svg viewBox="0 0 220 180" className="w-full" style={{ maxHeight: '160px' }}>
                                     {CharSVG && <CharSVG color={color} playing={isPlaying} />}
                                 </svg>

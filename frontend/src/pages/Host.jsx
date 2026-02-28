@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { useRoomStore } from '../store/roomStore'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -21,9 +22,10 @@ function formatInputSummary(inputs) {
 }
 
 export default function Host() {
-  const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs } = useRoomStore()
+  const { roomId, roomName, userId, isPlaying, isConnected, activePrompts, influenceWeights, bpm, geminiReasoning, participants, timeline, applauseLevel, currentInputs, reset } = useRoomStore()
   const { startMusic, stopMusic } = useWebSocket()
   const { unlock } = useAudioPlayer()
+  const navigate = useNavigate()
   const [showQR, setShowQR] = useState(true)
   const timelineEndRef = useRef(null)
 
@@ -97,6 +99,17 @@ export default function Host() {
 
               {/* Band Stage — animated SVG characters */}
               <BandStage participants={participants} isPlaying={isPlaying} currentInputs={currentInputs} />
+
+              {/* Session Timeline — horizontal scroll under stage */}
+              <div
+                className="rounded-[2rem] px-5 py-4"
+                style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-3 text-[#00D1FF]">
+                  Session Story
+                </p>
+                <Timeline events={timeline} />
+              </div>
 
               {/* Live Audio Visualizer card */}
               <div
@@ -254,17 +267,6 @@ export default function Host() {
                 </div>
               )}
 
-              {/* Session Story — Timeline */}
-              <div
-                className="rounded-[2rem] p-6"
-                style={{ background: 'rgba(0,12,30,0.65)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,209,255,0.14)' }}
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.40em] mb-4 text-[#00D1FF]">
-                  Session Story
-                </p>
-                <Timeline events={timeline} />
-              </div>
-
               {/* Band Members — with display names + current inputs */}
               <div
                 className="rounded-[2rem] p-6"
@@ -298,6 +300,23 @@ export default function Host() {
                   </div>
                 )}
               </div>
+
+              {/* Leave Room */}
+              <button
+                onClick={() => {
+                  if (isPlaying) stopMusic(userId, roomId)
+                  reset()
+                  navigate('/')
+                }}
+                className="w-full py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                style={{
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.20)',
+                  color: '#f87171',
+                }}
+              >
+                Leave Room
+              </button>
             </div>
           </div>
         </>
