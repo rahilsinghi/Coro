@@ -223,6 +223,46 @@ async def websocket_endpoint(websocket: WebSocket):
                     except ValueError:
                         pass  # Unknown role, ignore
 
+            # ── DROP ────────────────────────────────────────────────────────
+            elif msg_type == "drop":
+                if not room_id:
+                    continue
+                triggered = room_service.record_drop(room_id)
+                if triggered:
+                    # Override Gemini — force a drop prompt directly to Lyria
+                    from google.genai import types as drop_types
+                    drop_prompts = [
+                        drop_types.WeightedPrompt(
+                            text="massive bass drop with thundering sub-bass, distorted 808 kick, building tension release, crowd energy explosion",
+                            weight=0.7
+                        ),
+                        drop_types.WeightedPrompt(
+                            text="intense electronic drop with rapid-fire hi-hats, aggressive synth stabs, maximum energy peak moment",
+                            weight=0.3
+                        ),
+                    ]
+                    room = room_service.rooms.get(room_id)
+                    if room:
+                        await lyria_service.update_prompts(
+                            room_id=room_id,
+                            prompts=drop_prompts,
+                            bpm=min(room.bpm + 20, 160),
+                            density=1.0,
+                            brightness=0.3,
+                        )
+                        await room_service.broadcast_json(room_id, {
+                            "type": "drop_triggered",
+                            "message": "🔥 DROP!"
+                        })
+                else:
+                    # Broadcast drop count so UI can show building pressure
+                    count = len(room_service._drop_presses.get(room_id, []))
+                    await room_service.broadcast_json(room_id, {
+                        "type": "drop_progress",
+                        "count": count,
+                        "needed": 3,
+                    })
+
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected: user={user_id}, room={room_id}")
     except Exception as e:
