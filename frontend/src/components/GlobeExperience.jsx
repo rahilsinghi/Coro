@@ -34,97 +34,28 @@ function createProceduralTexture() {
     return tex
 }
 
-// ─── Large flat background rings — full-viewport coverage ────────────────────
-function BackgroundRings({ analyser, isBackground }) {
-    const ringsRef = useRef([])
-    const dataArray = useMemo(() => analyser ? new Uint8Array(analyser.frequencyBinCount) : null, [analyser])
-    const BG_COUNT = 32
 
-    const bgParams = useMemo(() => Array.from({ length: BG_COUNT }, (_, i) => ({
-        // Rings go from radius 7 to 45 — outer ones extend well beyond viewport
-        scale: 7 + i * 1.25,
-        glow: 8 + i * 1.26, // slightly larger glow twin
-        phase: (i / BG_COUNT) * Math.PI * 2,
-        freq: 0.4 + (i % 5) * 0.18,
-        ampA: 0.025 + (i % 3) * 0.012,
-        ampB: 0.014 + (i % 4) * 0.008,
-        freqB: 1.1 + (i % 7) * 0.2,
-        color: i % 6 === 0 ? '#7C3AED' : i % 3 === 0 ? '#2D6BFF' : '#00D1FF',
-        coreOp: 0.22 - i * 0.005,
-        glowOp: 0.14 - i * 0.003,
-    })), [])
-
-    useFrame((state) => {
-        const t = state.clock.elapsedTime
-        let amp = analyser && dataArray
-            ? (analyser.getByteFrequencyData(dataArray), dataArray.reduce((s, v) => s + v, 0) / dataArray.length / 255)
-            : 0.12 + Math.sin(t * 0.7) * 0.07 + Math.sin(t * 1.4) * 0.04
-
-        ringsRef.current.forEach((ring, i) => {
-            if (!ring) return
-            const p = bgParams[i]
-            // Squishy: X and Z scale independently via two overlapping sinusoids
-            const sX = (1 + Math.sin(t * p.freq + p.phase) * p.ampA + amp * 0.06)
-            const sZ = (1 + Math.cos(t * p.freqB + p.phase * 1.3) * p.ampB + amp * 0.04)
-            // Core ring (index 0) and glow ring (index 1) are children
-            const core = ring.children[0], glow = ring.children[1]
-            if (core) {
-                core.scale.set(p.scale * sX, 1, p.scale * sZ)
-                if (core.children[0]?.material)
-                    core.children[0].material.opacity = Math.max(0, (isBackground ? 0.05 : p.coreOp) + amp * 0.15)
-            }
-            if (glow) {
-                glow.scale.set(p.glow * sX * 1.01, 1, p.glow * sZ * 1.01)
-                if (glow.children[0]?.material)
-                    glow.children[0].material.opacity = Math.max(0, (isBackground ? 0.02 : p.glowOp) + amp * 0.08)
-            }
-        })
-    })
-
-    return (
-        <group>
-            {bgParams.map((p, i) => (
-                <group key={i} ref={el => { ringsRef.current[i] = el }}>
-                    {/* Core crisp ring */}
-                    <group scale={p.scale}>
-                        <mesh>
-                            <ringGeometry args={[1, 1.008, 128]} />
-                            <meshBasicMaterial color={p.color} transparent opacity={p.coreOp}
-                                blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
-                        </mesh>
-                    </group>
-                    {/* Glow twin — slightly wider, lower opacity */}
-                    <group scale={p.glow}>
-                        <mesh>
-                            <ringGeometry args={[1, 1.025, 128]} />
-                            <meshBasicMaterial color={p.color} transparent opacity={p.glowOp}
-                                blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
-                        </mesh>
-                    </group>
-                </group>
-            ))}
-        </group>
-    )
-}
-
-// ─── Tilted orbital rings — 3D depth around the globe ─────────────────────────
-const ORBIT_COUNT = 14
+// ─── Orbital rings — tilted 3D orbits, extended scale, vibrant neon ───────────
+const ORBIT_COUNT = 28
 function OrbitingRings({ analyser, isBackground }) {
     const ringsRef = useRef([])
+    const glowRefs = useRef([])
     const dataArray = useMemo(() => analyser ? new Uint8Array(analyser.frequencyBinCount) : null, [analyser])
 
     const params = useMemo(() => Array.from({ length: ORBIT_COUNT }, (_, i) => {
-        const tier = i % 3
+        const tier = i % 4
+        // All rings are strongly tilted (min 0.4 rad ≈ 23°) so NONE appear as a flat horizontal strip
         return {
-            scale: 5.2 + i * 0.28,
-            tiltX: tier === 0 ? 0.28 : tier === 1 ? 0.9 : 1.55,
-            tiltZ: (i * Math.PI * 1.4) / ORBIT_COUNT,
-            prec: (0.001 + i * 0.0003) * (i % 2 === 0 ? 1 : -1),
-            shimFreq: 0.6 + (i % 5) * 0.25,
-            shimAmp: 0.022 + (i % 3) * 0.008,
-            heatFreq: 1.3 + (i % 7) * 0.2,
-            phase: (i / ORBIT_COUNT) * Math.PI * 2.5,
-            baseOp: 0.30 - i * 0.012,
+            scale: 5.5 + i * 0.60,           // extends from 5.5 → 22 world units
+            tiltX: tier === 0 ? 0.45 : tier === 1 ? 0.95 : tier === 2 ? 1.45 : 1.85,
+            tiltZ: (i * Math.PI * 1.618) / ORBIT_COUNT,  // golden-ratio spread
+            prec: (0.0008 + i * 0.00025) * (i % 2 === 0 ? 1 : -1),
+            shimFreq: 0.5 + (i % 6) * 0.22,
+            shimAmp: 0.020 + (i % 4) * 0.008,
+            heatFreq: 1.2 + (i % 7) * 0.2,
+            phase: (i / ORBIT_COUNT) * Math.PI * 3,
+            baseOp: 0.35 - i * 0.007,          // boosted base opacity
+            glowOp: 0.18 - i * 0.004,          // glow twin opacity
             color: i % 5 === 0 ? '#7C3AED' : i % 3 === 0 ? '#2D6BFF' : '#00D1FF',
         }
     }), [])
@@ -140,22 +71,42 @@ function OrbitingRings({ analyser, isBackground }) {
             const p = params[i]
             ring.rotation.y += p.prec
             const h1 = Math.sin(t * p.shimFreq + p.phase) * p.shimAmp
-            const h2 = Math.cos(t * p.heatFreq + p.phase * 1.3) * (p.shimAmp * 0.55)
-            ring.scale.set(p.scale * (1 + h1 + amp * 0.07), p.scale, p.scale * (1 + h2 + amp * 0.05))
+            const h2 = Math.cos(t * p.heatFreq + p.phase * 1.3) * (p.shimAmp * 0.5)
+            const sX = p.scale * (1 + h1 + amp * 0.08)
+            const sZ = p.scale * (1 + h2 + amp * 0.06)
+            ring.scale.set(sX, p.scale, sZ)
             const mat = ring.children[0]?.material
-            if (mat) mat.opacity = Math.max(0.01, (isBackground ? 0.05 : p.baseOp) + amp * 0.20 + Math.sin(t * p.shimFreq * 0.5) * 0.03)
+            if (mat) mat.opacity = Math.max(0.01, (isBackground ? 0.04 : p.baseOp) + amp * 0.22 + Math.sin(t * p.shimFreq * 0.5) * 0.04)
+        })
+
+        glowRefs.current.forEach((ring, i) => {
+            if (!ring) return
+            const p = params[i]
+            const mat = ring.children[0]?.material
+            if (mat) mat.opacity = Math.max(0, (isBackground ? 0.02 : p.glowOp) + amp * 0.10)
         })
     })
 
     return (
         <group>
             {params.map((p, i) => (
-                <group key={i} ref={el => { ringsRef.current[i] = el }} rotation={[p.tiltX, 0, p.tiltZ]}>
-                    <mesh>
-                        <ringGeometry args={[1, 1.012, 128]} />
-                        <meshBasicMaterial color={p.color} transparent opacity={p.baseOp}
-                            blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
-                    </mesh>
+                <group key={i}>
+                    {/* Crisp core ring */}
+                    <group ref={el => { ringsRef.current[i] = el }} rotation={[p.tiltX, 0, p.tiltZ]}>
+                        <mesh>
+                            <ringGeometry args={[1, 1.010, 128]} />
+                            <meshBasicMaterial color={p.color} transparent opacity={p.baseOp}
+                                blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+                        </mesh>
+                    </group>
+                    {/* Soft glow twin — wider, lower opacity, same tilt */}
+                    <group ref={el => { glowRefs.current[i] = el }} rotation={[p.tiltX, 0, p.tiltZ]} scale={p.scale * 1.018}>
+                        <mesh>
+                            <ringGeometry args={[1, 1.032, 128]} />
+                            <meshBasicMaterial color={p.color} transparent opacity={p.glowOp}
+                                blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+                        </mesh>
+                    </group>
                 </group>
             ))}
         </group>
@@ -238,21 +189,16 @@ function Planet({ analyser, isBackground }) {
     )
 }
 
-// ─── Scene root ───────────────────────────────────────────────────────────────
+// ─── Scene root — NO global tilt (would create edge-on strip illusion) ────────
 function Scene({ analyser, isBackground }) {
-    const ref = useRef()
-    useFrame((s) => {
-        if (ref.current) ref.current.rotation.x = Math.sin(s.clock.elapsedTime * 0.045) * 0.035
-    })
     return (
-        <group ref={ref}>
-            {/* Background rings fill the whole viewport */}
-            <BackgroundRings analyser={analyser} isBackground={isBackground} />
-            <Float speed={1.2} rotationIntensity={0.22} floatIntensity={0.3}>
+        <group>
+            {/* Orbital rings first (background layer) */}
+            <OrbitingRings analyser={analyser} isBackground={isBackground} />
+            <Float speed={1.2} rotationIntensity={0.18} floatIntensity={0.28}>
                 <Planet analyser={analyser} isBackground={isBackground} />
-                <OrbitingRings analyser={analyser} isBackground={isBackground} />
-                {Array.from({ length: 40 }).map((_, i) => (
-                    <LightSpike key={i} index={i} total={40} analyser={analyser} />
+                {Array.from({ length: 35 }).map((_, i) => (
+                    <LightSpike key={i} index={i} total={35} analyser={analyser} />
                 ))}
             </Float>
         </group>
@@ -337,22 +283,26 @@ export default function GlobeExperience({ analyser }) {
                                 <div className="w-8 h-px" style={{ background: 'linear-gradient(to left, transparent, rgba(0,209,255,0.5))' }} />
                             </div>
 
-                            {/* ── Two-line tagline with clear size hierarchy ── */}
+                            {/* ── Line 2: smaller ── */}
                             <p
                                 className="font-semibold text-white leading-tight tracking-tight whitespace-nowrap"
-                                style={{ fontSize: 'clamp(0.85rem, 2.2vw, 1.05rem)' }}
+                                style={{ fontSize: 'clamp(0.78rem, 2vw, 0.95rem)', opacity: 0.85 }}
                             >
                                 The Room Decides The Rhythm
                             </p>
+                            {/* ── Line 3: bigger, bolder ── */}
                             <p
-                                className="font-black text-white leading-tight tracking-tight whitespace-nowrap mb-8"
-                                style={{ fontSize: 'clamp(1.15rem, 3.2vw, 1.55rem)', marginTop: '0.35rem' }}
+                                className="font-black text-white leading-tight tracking-tighter whitespace-nowrap mb-5"
+                                style={{ fontSize: 'clamp(1.1rem, 3vw, 1.45rem)', marginTop: '0.3rem' }}
                             >
                                 Music, Made By Everyone
                             </p>
 
-                            <p className="text-sm font-medium leading-relaxed mb-10"
-                                style={{ color: 'rgba(255,255,255,0.45)', maxWidth: '260px' }}>
+                            {/* ── Line 4: description, nowrap ── */}
+                            <p
+                                className="font-medium whitespace-nowrap mb-7"
+                                style={{ fontSize: 'clamp(0.65rem, 1.4vw, 0.78rem)', color: 'rgba(255,255,255,0.42)' }}
+                            >
                                 Converge live crowd signals into a shared, evolving musical sphere.
                             </p>
 
