@@ -133,6 +133,7 @@ class LyriaService:
 
             # Update weighted prompts — this is what makes the music morph
             await session.set_weighted_prompts(prompts=prompts)
+            session_data["last_prompts"] = prompts  # cached for immediate applause replay
 
             print(f"[Lyria] Updated prompts for room {room_id}: {[p.text for p in prompts]}")
 

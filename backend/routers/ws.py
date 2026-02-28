@@ -234,19 +234,57 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "applause_update":
                 if not room_id:
                     continue
-                volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
+                raw_volume = max(0.0, min(1.0, float(msg.get("volume", 0.0))))
                 room = room_service.rooms.get(room_id)
                 if room:
-                    # Smooth blend: 30% mic input, 70% existing state
-                    blended_density = round(room.density * 0.7 + volume * 0.3, 2)
+                    # sqrt curve: amplifies soft sounds so even quiet claps are noticeable
+                    # e.g. 0.1 raw → 0.32 scaled, 0.5 raw → 0.71 scaled, 1.0 → 1.0
+                    import math
+                    scaled = round(math.sqrt(raw_volume), 3)
+
+                    # Loud applause (scaled >= 0.7) doubles current density, capped at 1.0
+                    # Soft claps still push density meaningfully via 60% mic weight
+                    if scaled >= 0.7:
+                        new_density = round(min(room.density * 2.0, 1.0), 2)
+                        new_brightness = round(min(room.brightness * 1.5, 1.0), 2)
+                    else:
+                        new_density = round(min(room.density * 0.4 + scaled * 0.6, 1.0), 2)
+                        new_brightness = room.brightness
+
+                    # Write back so the next Gemini tick sees the updated state
+                    room.density = new_density
+                    room.brightness = new_brightness
                     room.current_inputs["crowd_energy"] = {
-                        "applause_volume": round(volume, 2),
-                        "blended_density": blended_density,
+                        "applause_volume": round(raw_volume, 2),
+                        "scaled_volume": scaled,
+                        "density": new_density,
+                        "brightness": new_brightness,
                     }
-                    print(f"[WS] Applause update room={room_id} volume={volume:.2f} blended_density={blended_density:.2f}")
+
+                    # Push the change to Lyria immediately (don't wait 4 s for the tick)
+                    if room.is_playing:
+                        session_data = lyria_service._sessions.get(room_id)
+                        if session_data:
+                            current_prompts = session_data.get("last_prompts")
+                            if current_prompts:
+                                await lyria_service.update_prompts(
+                                    room_id=room_id,
+                                    prompts=current_prompts,
+                                    bpm=session_data.get("bpm", room.bpm),
+                                    density=new_density,
+                                    brightness=new_brightness,
+                                )
+
+                    print(
+                        f"[WS] Applause room={room_id} raw={raw_volume:.2f} "
+                        f"scaled={scaled:.2f} density={new_density:.2f} brightness={new_brightness:.2f}"
+                    )
                     await room_service.broadcast_json(room_id, {
                         "type": "applause_level",
-                        "volume": round(volume, 2),
+                        "volume": round(raw_volume, 2),
+                        "scaled_volume": scaled,
+                        "density": new_density,
+                        "loud": scaled >= 0.7,
                     })
 
             # ── DROP ────────────────────────────────────────────────────────

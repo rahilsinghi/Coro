@@ -239,7 +239,7 @@ export default function Guest() {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((a, b) => a + b, 0) / data.length / 255
         send({ type: 'applause_update', user_id: userId, room_id: roomId, volume: avg })
-      }, 500)
+      }, 200)
       micStreamRef.current._interval = interval
     } catch (e) {
       console.warn('[Mic] Permission denied or unavailable:', e)
