@@ -4,17 +4,19 @@ Takes the current room inputs and arbitrates them into Lyria weighted prompts.
 """
 import json
 import os
+import re
 from typing import Dict, Any, List
 from google import genai
+from google.genai import types as genai_types
 from models.schemas import WeightedPrompt, ArbitrationResult
 
 ARBITRATION_SYSTEM_PROMPT = """
 You are a real-time music director for a crowd-controlled generative music system.
-Every few seconds you receive inputs from multiple people each controlling a different 
-dimension of the music. Your job is to synthesize their inputs into 2-3 Lyria 
+Every few seconds you receive inputs from multiple people each controlling a different
+dimension of the music. Your job is to synthesize their inputs into 2-3 Lyria
 weighted prompts that:
 1. Honor the dominant crowd preference
-2. Blend conflicting inputs musically coherently  
+2. Blend conflicting inputs musically coherently
 3. Maintain energy continuity — don't flip completely from one style to another in one step
 4. Keep prompts descriptive: include genre, instruments, mood, and energy level
 
@@ -34,8 +36,9 @@ Exact format:
 Rules:
 - 2 or 3 prompts max
 - Weights must sum exactly to 1.0
-- bpm must be integer between 60 and 160
-- density and brightness must be floats between 0.0 and 1.0
+- bpm must be an integer between 60 and 160
+- density must be a decimal float between 0.0 and 1.0 (e.g. 0.7, not "High")
+- brightness must be a decimal float between 0.0 and 1.0 (e.g. 0.3, not "Low")
 - Prompt text should be evocative and musical (e.g. "dark trap beat with heavy 808s and eerie synths")
 """
 
@@ -80,26 +83,35 @@ class GeminiService:
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=user_input_summary,
-                config={
-                    "system_instruction": ARBITRATION_SYSTEM_PROMPT,
-                    "temperature": 0.7,
-                    "max_output_tokens": 300,
-                }
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=ARBITRATION_SYSTEM_PROMPT,
+                    temperature=0.7,
+                    max_output_tokens=2000,
+                    thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                ),
             )
 
-            raw_text = response.text.strip()
-            # Strip any accidental markdown fences
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
+            raw_text = (response.text or "").strip()
+            # Strip markdown fences if present
+            match = re.search(r"```(?:json)?\s*([\s\S]+?)```", raw_text)
+            if match:
+                raw_text = match.group(1).strip()
 
             data = json.loads(raw_text)
+            prompts = [WeightedPrompt(**p) for p in data["prompts"]]
+            # Normalise weights so they always sum to exactly 1.0
+            total = sum(p.weight for p in prompts)
+            if total > 0:
+                for p in prompts:
+                    p.weight = round(p.weight / total, 3)
+            # Clamp density and brightness to [0.0, 1.0]
+            density = max(0.0, min(1.0, float(data["density"])))
+            brightness = max(0.0, min(1.0, float(data["brightness"])))
             result = ArbitrationResult(
-                prompts=[WeightedPrompt(**p) for p in data["prompts"]],
-                bpm=int(data["bpm"]),
-                density=float(data["density"]),
-                brightness=float(data["brightness"]),
+                prompts=prompts,
+                bpm=max(60, min(200, int(data["bpm"]))),
+                density=density,
+                brightness=brightness,
                 reasoning=data.get("reasoning", ""),
             )
             self._last_results[room_id] = result
