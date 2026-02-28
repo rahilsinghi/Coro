@@ -40,8 +40,9 @@ function LightSpike({ index, total, analyser }) {
             <meshBasicMaterial
                 color="#00c3ff"
                 transparent
-                opacity={0.6}
+                opacity={0.3}
                 blending={THREE.AdditiveBlending}
+                depthWrite={false}
             />
         </mesh>
     )
@@ -71,11 +72,11 @@ function EnergyField({ isBackground }) {
             <MeshDistortMaterial
                 color="#001a33"
                 emissive="#00c3ff"
-                emissiveIntensity={0.6}
+                emissiveIntensity={1.2}
                 transparent
-                opacity={isBackground ? 0.2 : 0.8}
-                distort={0.6}
-                speed={reducedMotion ? 0.1 : 1.5}
+                opacity={isBackground ? 0.15 : 0.4}
+                distort={0.4}
+                speed={reducedMotion ? 0.05 : 0.8}
                 roughness={0}
                 metalness={1}
                 wireframe={false}
@@ -102,16 +103,17 @@ function PortalCore({ analyser, isBackground }) {
     return (
         <group ref={groupRef} position={[0, 0.5, 0]}>
             <Float speed={reducedMotion ? 0.2 : 2.5} rotationIntensity={1} floatIntensity={0.8}>
-                {/* Central Glowing Orb */}
-                <mesh ref={coreRef}>
-                    <sphereGeometry args={[1, 64, 64]} />
+                {/* Central Glowing Orb - MASSIVE SCALE */}
+                <mesh ref={coreRef} scale={1.8}>
+                    <sphereGeometry args={[4, 64, 64]} />
                     <MeshDistortMaterial
                         color="#000d1a"
                         emissive="#00c3ff"
-                        emissiveIntensity={3}
-                        distort={0.35}
-                        speed={3}
+                        emissiveIntensity={5}
+                        distort={0.4}
+                        speed={1.5}
                         roughness={0}
+                        metalness={1}
                     />
                 </mesh>
 
@@ -128,11 +130,17 @@ function PortalCore({ analyser, isBackground }) {
                     </Torus>
                 </group>
 
-                {/* Background Concentric Rings (Flat) */}
-                {Array.from({ length: 15 }).map((_, i) => (
-                    <mesh key={i} rotation={[Math.PI / 2, 0, 0]} scale={2 + i * 0.4}>
-                        <ringGeometry args={[1, 1.01, 128]} />
-                        <meshBasicMaterial color="#00c3ff" transparent opacity={0.1 - i * 0.006} blending={THREE.AdditiveBlending} />
+                {/* High Density Soundwaves / Extra Rings */}
+                {Array.from({ length: 80 }).map((_, i) => (
+                    <mesh key={i} rotation={[Math.PI / 2, 0, 0]} scale={4 + i * 0.12}>
+                        <ringGeometry args={[1, 1.002, 128]} />
+                        <meshBasicMaterial
+                            color={i % 10 === 0 ? "#7c3aed" : (i % 4 === 0 ? "#06b6d4" : "#00c3ff")}
+                            transparent
+                            opacity={0.025 - (i * 0.0003)}
+                            blending={THREE.AdditiveBlending}
+                            depthWrite={false}
+                        />
                     </mesh>
                 ))}
 
@@ -165,23 +173,23 @@ export default function GlobeExperience({ analyser }) {
             />
 
             <div className={`absolute inset-0 flex items-center justify-center transition-all duration-2000 ${hasEnteredCoro ? 'scale-[2.5] opacity-0 blur-3xl translate-y-80' : 'scale-100 opacity-100'}`}>
-                <Canvas camera={{ position: [0, 4, 10], fov: 40 }} dpr={[1, 2]} antialias>
+                <Canvas camera={{ position: [0, 0, 20], fov: 50 }} dpr={[1, 2]} antialias>
                     <color attach="background" args={['#000000']} />
-                    <fog attach="fog" args={['#000000', 8, 25]} />
-                    <ambientLight intensity={0.1} />
+                    <fog attach="fog" args={['#000000', 15, 40]} />
+                    <ambientLight intensity={0.25} />
 
                     {/* Atmospheric Lights */}
-                    <pointLight position={[10, 10, 10]} intensity={2.5} color="#00c3ff" />
-                    <pointLight position={[-10, -5, -5]} intensity={1.5} color="#004080" />
+                    <pointLight position={[20, 20, 20]} intensity={4} color="#00c3ff" />
+                    <pointLight position={[-20, -10, -10]} intensity={3} color="#7c3aed" />
 
                     {/* The Cinematic Amber Glow Hit from Image 1 */}
-                    <pointLight position={[0, -0.5, 0]} intensity={15} distance={10} color="#f59e0b" decay={2} />
-                    <pointLight position={[0, 0.5, 0]} intensity={8} distance={8} color="#00c3ff" decay={2} />
+                    <pointLight position={[0, -5, 0]} intensity={35} distance={30} color="#f59e0b" decay={2} />
+                    <pointLight position={[0, 5, 0]} intensity={20} distance={20} color="#00c3ff" decay={2} />
 
                     <PortalCore analyser={analyser} isBackground={hasEnteredCoro} />
                     <EnergyField isBackground={hasEnteredCoro} />
 
-                    <ContactShadows position={[0, -0.8, 0]} opacity={0.7} scale={25} blur={3.5} far={5} />
+                    <ContactShadows position={[0, -2, 0]} opacity={0.6} scale={50} blur={5} far={10} />
                     <Environment preset="night" />
                 </Canvas>
             </div>
@@ -194,28 +202,28 @@ export default function GlobeExperience({ analyser }) {
                         exit={{ opacity: 0, scale: 1.15, filter: 'blur(30px)' }}
                         className="absolute inset-0 flex flex-col items-center justify-center z-50 pointer-events-none"
                     >
-                        <div className="bg-[#000d1a]/85 backdrop-blur-[60px] border border-white/5 p-14 md:p-24 rounded-[4rem] shadow-[0_0_150px_rgba(0,195,255,0.25)] flex flex-col items-center max-w-4xl mx-auto text-center pointer-events-auto mt-80">
-                            <div className="flex items-center gap-6 mb-6">
-                                <span className="w-16 h-[2px] bg-[#00c3ff]/20" />
-                                <h2 className="text-[#00c3ff] text-base uppercase tracking-[1em] font-black drop-shadow-[0_0_10px_rgba(0,195,255,0.5)]">CORO</h2>
-                                <span className="w-16 h-[2px] bg-[#00c3ff]/20" />
+                        <div className="bg-[#000d1a]/60 backdrop-blur-md border border-white/10 p-10 sm:p-12 rounded-[2.5rem] shadow-[0_0_120px_rgba(0,195,255,0.1)] flex flex-col items-center max-w-lg mx-auto text-center pointer-events-auto">
+                            <div className="flex items-center gap-6 mb-4">
+                                <span className="w-10 h-px bg-[#00c3ff]/30" />
+                                <h2 className="text-[#00c3ff]/80 text-[10px] uppercase tracking-[1.5em] font-black drop-shadow-[0_0_10px_rgba(0,195,255,0.4)]">CORO</h2>
+                                <span className="w-10 h-px bg-[#00c3ff]/30" />
                             </div>
 
-                            <h1 className="text-6xl md:text-8xl font-black text-white mb-10 leading-[1.05] tracking-tighter drop-shadow-2xl">
+                            <h1 className="text-3xl md:text-4xl font-black text-white mb-6 leading-tight tracking-tighter drop-shadow-2xl">
                                 Crowd Orchestrated<br />Realtime Output
                             </h1>
 
-                            <p className="text-cs-muted text-lg md:text-xl max-w-xl mb-14 leading-relaxed font-semibold opacity-80 italic tracking-tight">
+                            <p className="text-cs-muted text-xs md:text-sm max-w-xs mb-10 leading-relaxed font-semibold opacity-70 italic tracking-tight">
                                 Live crowd signals converging into one<br />evolving musical sphere.
                             </p>
 
                             <button
                                 onClick={handleEnter}
-                                className="relative bg-[#00c3ff] hover:bg-[#00e5ff] text-black font-black px-20 py-7 rounded-[2rem] text-2xl transition-all shadow-[0_25px_80px_rgba(0,195,255,0.5)] hover:shadow-[0_30px_100px_rgba(0,195,255,0.7)] active:scale-95 group overflow-hidden"
+                                className="relative bg-[#00c3ff] hover:bg-[#00e5ff] text-black font-black px-12 py-4 rounded-xl text-lg transition-all shadow-[0_15px_40px_rgba(0,195,255,0.3)] hover:shadow-[0_20px_60px_rgba(0,195,255,0.5)] active:scale-95 group overflow-hidden"
                             >
-                                <span className="relative z-10 flex items-center gap-4">
+                                <span className="relative z-10 flex items-center gap-3">
                                     Enter CORO Studio
-                                    <svg className="w-8 h-8 transform group-hover:translate-x-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                     </svg>
                                 </span>

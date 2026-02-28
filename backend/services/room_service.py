@@ -18,11 +18,11 @@ class RoomService:
         self.connections: Dict[str, Set[WebSocket]] = {}
         # room_id → user_id → WebSocket
         self.user_sockets: Dict[str, Dict[str, WebSocket]] = {}
-        # user_id → role
-        self.user_roles: Dict[str, Role] = {}
+        # room_id -> user_id -> Role
+        self.user_roles: Dict[str, Dict[str, Role]] = {}
         # role assignment order for new joins
         self._role_queue = [Role.DRUMMER, Role.VIBE_SETTER, Role.GENRE_DJ, Role.INSTRUMENTALIST]
-        # room_id → asyncio task for tick loop
+        # room_id -> asyncio task for tick loop
         self._tick_tasks: Dict[str, asyncio.Task] = {}
 
     def create_room(self, host_id: str) -> RoomState:
@@ -40,6 +40,7 @@ class RoomService:
         self.rooms[room_id] = room
         self.connections[room_id] = set()
         self.user_sockets[room_id] = {}
+        self.user_roles[room_id] = {}
         return room
 
     def join_room(self, room_id: str, user_id: str, ws: WebSocket) -> Optional[Role]:
@@ -49,8 +50,12 @@ class RoomService:
         self.connections[room_id].add(ws)
         self.user_sockets[room_id][user_id] = ws
 
+        # Re-assign if user already has a role in this room
+        if user_id in self.user_roles.get(room_id, {}):
+            return self.user_roles[room_id][user_id]
+
         # Assign next available role
-        taken_roles = set(self.user_roles.values())
+        taken_roles = set(self.user_roles.get(room_id, {}).values())
         assigned_role = None
         for role in self._role_queue:
             if role not in taken_roles:
@@ -60,15 +65,18 @@ class RoomService:
         if not assigned_role:
             assigned_role = Role.ENERGY
 
-        self.user_roles[user_id] = assigned_role
+        if room_id not in self.user_roles:
+            self.user_roles[room_id] = {}
+        self.user_roles[room_id][user_id] = assigned_role
         return assigned_role
 
     def remove_connection(self, room_id: str, user_id: str, ws: WebSocket):
+        """Remove explicit socket connection, but persist the role for transient disconnects."""
         if room_id in self.connections:
             self.connections[room_id].discard(ws)
         if room_id in self.user_sockets:
             self.user_sockets[room_id].pop(user_id, None)
-        self.user_roles.pop(user_id, None)
+        # We NO LONGER pop user_roles here. Roles persist per room for session stability.
 
     def update_input(self, room_id: str, role: Role, payload: Dict[str, Any]):
         if room_id not in self.rooms:

@@ -4,34 +4,43 @@ import { useAudioPlayer } from './useAudioPlayer'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 
-export function useWebSocket() {
-  const wsRef = useRef(null)
-  const reconnectTimerRef = useRef(null)
-  const { enqueueAudio } = useAudioPlayer()
+/**
+ * Singleton WebSocket Manager
+ * Prevents "WebSocket Connection Storm" where every component creates its own connection.
+ */
+class WebSocketManager {
+  constructor() {
+    this.ws = null
+    this.reconnectTimer = null
+    this.store = null
+    this.enqueueAudio = null
+    this.onMessageCallbacks = new Set()
+  }
 
-  const {
-    setConnected,
-    setPlaying,
-    applyStateUpdate,
-    setRoom,
-  } = useRoomStore()
+  init(store, enqueueAudio) {
+    this.store = store
+    this.enqueueAudio = enqueueAudio
+    this.connect()
+  }
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+  connect() {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return
 
+    console.log('[WS] Initializing Singleton Connection...')
     const ws = new WebSocket(WS_URL)
     ws.binaryType = 'arraybuffer'
-    wsRef.current = ws
+    this.ws = ws
 
     ws.onopen = () => {
       console.log('[WS] Connected')
-      setConnected(true)
+      this.store?.setConnected(true)
     }
 
     ws.onclose = () => {
       console.log('[WS] Disconnected — reconnecting in 2s...')
-      setConnected(false)
-      reconnectTimerRef.current = setTimeout(connect, 2000)
+      this.store?.setConnected(false)
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = setTimeout(() => this.connect(), 2000)
     }
 
     ws.onerror = (err) => {
@@ -39,40 +48,37 @@ export function useWebSocket() {
     }
 
     ws.onmessage = (event) => {
-      // Binary = audio chunk
       if (event.data instanceof ArrayBuffer) {
-        enqueueAudio(event.data)
+        this.enqueueAudio?.(event.data)
         return
       }
 
-      // Text = JSON message
       try {
         const msg = JSON.parse(event.data)
-        handleMessage(msg)
+        this.handleMessage(msg)
+        // Notify any active listeners (like createRoom/joinRoom promises)
+        this.onMessageCallbacks.forEach(cb => cb(msg))
       } catch (e) {
         console.warn('[WS] Could not parse message:', event.data)
       }
     }
-  }, [enqueueAudio, setConnected])
+  }
 
-  const handleMessage = useCallback((msg) => {
-    console.log('[WS] ←', msg.type, msg)
+  handleMessage(msg) {
+    // Basic logs
+    if (msg.type !== 'ping') {
+      console.log('[WS] ←', msg.type, msg)
+    }
+
     switch (msg.type) {
-      case 'room_created':
-      case 'joined':
-        // Handled inline in pages — don't store here
-        break
       case 'state_update':
-        applyStateUpdate(msg)
+        this.store?.applyStateUpdate(msg)
         break
       case 'music_started':
-        setPlaying(true)
+        this.store?.setPlaying(true)
         break
       case 'music_stopped':
-        setPlaying(false)
-        break
-      case 'ping':
-        // Heartbeat from server — ignore
+        this.store?.setPlaying(false)
         break
       case 'error':
         console.error('[WS] Server error:', msg.message)
@@ -80,58 +86,64 @@ export function useWebSocket() {
       default:
         break
     }
-  }, [applyStateUpdate, setPlaying])
+  }
 
-  const send = useCallback((message) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message))
+  send(message) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message))
     } else {
       console.warn('[WS] Cannot send — not connected')
     }
-  }, [])
+  }
 
-  // Actions
+  addListener(callback) {
+    this.onMessageCallbacks.add(callback)
+    return () => this.onMessageCallbacks.delete(callback)
+  }
+}
+
+const manager = new WebSocketManager()
+
+export function useWebSocket() {
+  const { enqueueAudio } = useAudioPlayer()
+  const store = useRoomStore()
+
+  // Initialize singleton on first hook call
+  useEffect(() => {
+    manager.init(store, enqueueAudio)
+  }, [store, enqueueAudio])
+
+  const send = useCallback((message) => manager.send(message), [])
+
   const createRoom = useCallback((userId) => {
     return new Promise((resolve) => {
-      const ws = wsRef.current
-      if (!ws) return
-
-      const handler = (event) => {
-        if (event.data instanceof ArrayBuffer) return
-        const msg = JSON.parse(event.data)
+      const cleanup = manager.addListener((msg) => {
         if (msg.type === 'room_created') {
-          ws.removeEventListener('message', handler)
-          setRoom(msg.room_id, userId, msg.role, true)
+          cleanup()
+          store.setRoom(msg.room_id, userId, msg.role, true)
           resolve(msg)
         }
-      }
-      ws.addEventListener('message', handler)
+      })
       send({ type: 'create_room', user_id: userId })
     })
-  }, [send, setRoom])
+  }, [send, store])
 
   const joinRoom = useCallback((roomId, userId) => {
     return new Promise((resolve) => {
-      const ws = wsRef.current
-      if (!ws) return
-
-      const handler = (event) => {
-        if (event.data instanceof ArrayBuffer) return
-        const msg = JSON.parse(event.data)
+      const cleanup = manager.addListener((msg) => {
         if (msg.type === 'joined') {
-          ws.removeEventListener('message', handler)
-          setRoom(msg.room_id, msg.user_id, msg.role, false)
+          cleanup()
+          store.setRoom(msg.room_id, msg.user_id, msg.role, false)
           resolve(msg)
         }
         if (msg.type === 'error') {
-          ws.removeEventListener('message', handler)
+          cleanup()
           resolve({ error: msg.message })
         }
-      }
-      ws.addEventListener('message', handler)
+      })
       send({ type: 'join_room', room_id: roomId.toUpperCase(), user_id: userId })
     })
-  }, [send, setRoom])
+  }, [send, store])
 
   const startMusic = useCallback((userId, roomId) => {
     send({ type: 'start_music', user_id: userId, room_id: roomId })
@@ -150,14 +162,6 @@ export function useWebSocket() {
       payload,
     })
   }, [send])
-
-  useEffect(() => {
-    connect()
-    return () => {
-      clearTimeout(reconnectTimerRef.current)
-      wsRef.current?.close()
-    }
-  }, [connect])
 
   return { send, createRoom, joinRoom, startMusic, stopMusic, sendInput }
 }

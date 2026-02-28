@@ -94,8 +94,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
+            # Check connection state before receiving
+            from fastapi.websockets import WebSocketState
+            if websocket.client_state == WebSocketState.DISCONNECTED:
+                break
+            
             # Handle both text (JSON) and binary messages
-            data = await websocket.receive()
+            try:
+                data = await websocket.receive()
+            except RuntimeError:
+                # This catches the "receive once a disconnect message has been received" error
+                break
 
             if "bytes" in data and data["bytes"]:
                 # Binary from client — not expected but ignore gracefully
